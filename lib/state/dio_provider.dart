@@ -17,6 +17,14 @@ final dioProvider = Provider<Dio>((ref) {
         }
         handler.next(options);
       },
+      onError: (error, handler) {
+        // Token vencido o firmado con otra clave: se cierra la sesión y el
+        // router redirige al login.
+        if (error.response?.statusCode == 401 && ref.read(authProvider).token != null) {
+          ref.read(authProvider.notifier).logout();
+        }
+        handler.next(error);
+      },
     ),
   );
 

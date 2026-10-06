@@ -81,7 +81,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<bool> login(String email, String password) =>
       _submit(() => _dio.post('/auth/login', data: {'email': email, 'password': password}));
 
-  Dio get _dio => Dio(BaseOptions(baseUrl: apiBaseUrl));
+  Dio get _dio => Dio(BaseOptions(
+        baseUrl: apiBaseUrl,
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 20),
+      ));
 
   Future<bool> _submit(Future<Response> Function() request) async {
     state = state.copyWith(isSubmitting: true, error: null);
