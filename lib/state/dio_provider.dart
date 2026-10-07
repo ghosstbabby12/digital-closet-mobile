@@ -6,7 +6,11 @@ import 'auth_provider.dart';
 
 /// Cliente Dio autenticado: adjunta el token JWT vigente a cada petición.
 final dioProvider = Provider<Dio>((ref) {
-  final dio = Dio(BaseOptions(baseUrl: apiBaseUrl, connectTimeout: const Duration(seconds: 10)));
+  final dio = Dio(BaseOptions(
+    baseUrl: apiBaseUrl,
+    connectTimeout: apiConnectTimeout,
+    receiveTimeout: apiReceiveTimeout,
+  ));
 
   dio.interceptors.add(
     InterceptorsWrapper(

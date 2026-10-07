@@ -17,6 +17,11 @@ String get apiBaseUrl {
   return 'http://127.0.0.1:8000';
 }
 
+/// El plan gratis de Render duerme el servidor tras 15 min sin uso y tarda
+/// hasta ~50 s en despertar, así que las esperas son generosas.
+const Duration apiConnectTimeout = Duration(seconds: 60);
+const Duration apiReceiveTimeout = Duration(seconds: 60);
+
 const List<String> occasionOptions = [
   'casual',
   'trabajo',

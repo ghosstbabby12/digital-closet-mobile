@@ -83,8 +83,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Dio get _dio => Dio(BaseOptions(
         baseUrl: apiBaseUrl,
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 20),
+        connectTimeout: apiConnectTimeout,
+        receiveTimeout: apiReceiveTimeout,
       ));
 
   Future<bool> _submit(Future<Response> Function() request) async {
