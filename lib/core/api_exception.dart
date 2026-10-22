@@ -16,6 +16,10 @@ class ApiException implements Exception {
     if (error.type == DioExceptionType.connectionError) {
       return ApiException('No se pudo conectar con el servidor. Verifica tu conexión.');
     }
+    final statusCode = error.response?.statusCode;
+    if (statusCode != null) {
+      return ApiException('El servidor respondió con un error ($statusCode). Intenta de nuevo.');
+    }
     return ApiException('Ocurrió un error inesperado. Intenta de nuevo.');
   }
 
