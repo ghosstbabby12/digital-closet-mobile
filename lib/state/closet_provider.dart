@@ -1,6 +1,5 @@
-import 'dart:io';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../models/garment.dart';
 import '../repositories/garment_repository.dart';
@@ -27,14 +26,14 @@ class ClosetNotifier extends StateNotifier<AsyncValue<List<Garment>>> {
     required String color,
     required WarmthLevel warmth,
     required String name,
-    required File imageFile,
+    required XFile image,
   }) async {
     final created = await _repository.create(
       category: category,
       color: color,
       warmth: warmth,
       name: name,
-      imageFile: imageFile,
+      image: image,
     );
     state = AsyncValue.data([created, ...state.value ?? []]);
   }

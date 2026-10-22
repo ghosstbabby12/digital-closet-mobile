@@ -1,5 +1,4 @@
-import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -21,7 +20,8 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
   final _nameController = TextEditingController();
   GarmentCategory _category = GarmentCategory.top;
   WarmthLevel _warmth = WarmthLevel.medium;
-  File? _imageFile;
+  XFile? _image;
+  Uint8List? _imageBytes;
   bool _submitting = false;
   String? _error;
 
@@ -35,7 +35,11 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
   Future<void> _pickImage(ImageSource source) async {
     final picked = await ImagePicker().pickImage(source: source, imageQuality: 85);
     if (picked != null) {
-      setState(() => _imageFile = File(picked.path));
+      final bytes = await picked.readAsBytes();
+      setState(() {
+        _image = picked;
+        _imageBytes = bytes;
+      });
     }
   }
 
@@ -68,7 +72,7 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
   }
 
   Future<void> _submit() async {
-    if (_imageFile == null) {
+    if (_image == null) {
       setState(() => _error = 'Agrega una foto de la prenda.');
       return;
     }
@@ -82,7 +86,7 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
             color: _colorController.text.trim(),
             warmth: _warmth,
             name: _nameController.text.trim(),
-            imageFile: _imageFile!,
+            image: _image!,
           );
       if (mounted) Navigator.pop(context);
     } on ApiException catch (e) {
@@ -110,7 +114,7 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
                   border: Border.all(color: AppColors.line),
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: _imageFile == null
+                child: _image == null
                     ? const Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -121,7 +125,7 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
                           ],
                         ),
                       )
-                    : Image.file(_imageFile!, fit: BoxFit.cover, width: double.infinity),
+                    : Image.memory(_imageBytes!, fit: BoxFit.cover, width: double.infinity),
               ),
             ),
             const SizedBox(height: 20),

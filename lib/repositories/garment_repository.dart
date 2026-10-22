@@ -1,7 +1,6 @@
-import 'dart:io';
-
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../core/api_exception.dart';
 import '../models/garment.dart';
@@ -27,7 +26,7 @@ class GarmentRepository {
     required String color,
     required WarmthLevel warmth,
     required String name,
-    required File imageFile,
+    required XFile image,
   }) async {
     try {
       final formData = FormData.fromMap({
@@ -35,9 +34,11 @@ class GarmentRepository {
         'color': color,
         'warmth': warmth.name,
         'name': name,
-        'image': await MultipartFile.fromFile(
-          imageFile.path,
-          filename: imageFile.uri.pathSegments.last,
+        // Se envían los bytes (no la ruta) para que funcione también en web.
+        'image': MultipartFile.fromBytes(
+          await image.readAsBytes(),
+          filename: image.name,
+          contentType: image.mimeType != null ? DioMediaType.parse(image.mimeType!) : null,
         ),
       });
       final response = await _dio.post('/garments', data: formData);
