@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../state/auth_provider.dart';
+import '../widgets/brand_mark.dart';
+import '../widgets/primary_button.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -36,7 +39,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final auth = ref.watch(authProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Crear cuenta')),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -47,6 +49,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const BrandMark(),
+                  const SizedBox(height: 28),
+                  Text(
+                    'Crea tu cuenta',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.displaySmall,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Guarda tu clóset y arma outfits según el clima',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 32),
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
@@ -73,18 +89,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   if (auth.error != null) ...[
                     const SizedBox(height: 14),
-                    Text(auth.error!, style: const TextStyle(color: Colors.redAccent)),
+                    Text(auth.error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
                   ],
                   const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: auth.isSubmitting ? null : _submit,
-                    child: auth.isSubmitting
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Text('Crear cuenta'),
+                  PrimaryButton(label: 'Crear cuenta', loading: auth.isSubmitting, onPressed: _submit),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () => context.go('/login'),
+                    child: const Text('¿Ya tienes cuenta? Inicia sesión'),
                   ),
                 ],
               ),

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../state/auth_provider.dart';
+import '../widgets/brand_mark.dart';
+import '../widgets/primary_button.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -45,8 +47,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const BrandMark(),
+                  const SizedBox(height: 28),
                   Text(
-                    'Curador de Moda IA',
+                    'Hola de nuevo',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.displaySmall,
                   ),
@@ -74,19 +78,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   if (auth.error != null) ...[
                     const SizedBox(height: 14),
-                    Text(auth.error!, style: const TextStyle(color: Colors.redAccent)),
+                    Text(auth.error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
                   ],
                   const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: auth.isSubmitting ? null : _submit,
-                    child: auth.isSubmitting
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Text('Entrar'),
-                  ),
+                  PrimaryButton(label: 'Entrar', loading: auth.isSubmitting, onPressed: _submit),
                   const SizedBox(height: 12),
                   TextButton(
                     onPressed: () => context.go('/register'),

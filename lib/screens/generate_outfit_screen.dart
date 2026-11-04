@@ -7,6 +7,8 @@ import '../core/app_theme.dart';
 import '../core/constants.dart';
 import '../state/outfit_provider.dart';
 import '../state/weather_provider.dart';
+import '../widgets/primary_button.dart';
+import '../widgets/screen_header.dart';
 
 class GenerateOutfitScreen extends ConsumerStatefulWidget {
   const GenerateOutfitScreen({super.key});
@@ -31,11 +33,14 @@ class _GenerateOutfitScreenState extends ConsumerState<GenerateOutfitScreen> {
   @override
   Widget build(BuildContext context) {
     final weatherAsync = ref.watch(weatherProvider);
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     ref.listen(outfitGenerateProvider, (previous, next) {
       next.whenOrNull(
         data: (outfit) {
           if (outfit != null) {
+            ref.invalidate(outfitHistoryProvider);
             context.push('/outfit-result', extra: outfit).then((_) {
               ref.read(outfitGenerateProvider.notifier).reset();
             });
@@ -50,51 +55,53 @@ class _GenerateOutfitScreenState extends ConsumerState<GenerateOutfitScreen> {
 
     final generating = ref.watch(outfitGenerateProvider).isLoading;
 
-    return Scaffold(
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            Text('¿Qué me pongo hoy?', style: Theme.of(context).textTheme.displaySmall),
-            const SizedBox(height: 6),
-            Text(
-              'Elige la ocasión y la IA arma tu outfit con lo que ya tienes en el clóset.',
-              style: Theme.of(context).textTheme.bodyMedium,
+    return SafeArea(
+      bottom: false,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const ScreenHeader(title: 'Estilista'),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, floatingNavClearance),
+              children: [
+                Text('¿Qué me pongo hoy?', style: textTheme.displaySmall),
+                const SizedBox(height: 8),
+                Text(
+                  'Elige la ocasión y arma tu outfit con lo que ya tienes en el clóset.',
+                  style: textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 22),
+                _WeatherCard(weatherAsync: weatherAsync, onRetry: () => ref.invalidate(weatherProvider)),
+                const SizedBox(height: 26),
+                Text('Ocasión', style: textTheme.titleLarge),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: occasionOptions.map((occasion) {
+                    final selected = occasion == _occasion;
+                    return ChoiceChip(
+                      label: Text('${occasion[0].toUpperCase()}${occasion.substring(1)}'),
+                      selected: selected,
+                      onSelected: (_) => setState(() => _occasion = occasion),
+                      labelStyle: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: selected ? scheme.onPrimary : scheme.onSurface,
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 28),
+                PrimaryButton(
+                  label: 'Vestirme hoy',
+                  loading: generating,
+                  onPressed: weatherAsync.isLoading ? null : _generate,
+                ),
+              ],
             ),
-            const SizedBox(height: 20),
-            _WeatherCard(weatherAsync: weatherAsync, onRetry: () => ref.refresh(weatherProvider)),
-            const SizedBox(height: 24),
-            Text('Ocasión', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: occasionOptions.map((occasion) {
-                final selected = occasion == _occasion;
-                return ChoiceChip(
-                  label: Text(occasion),
-                  selected: selected,
-                  onSelected: (_) => setState(() => _occasion = occasion),
-                  selectedColor: AppColors.ink,
-                  labelStyle: TextStyle(color: selected ? AppColors.card : AppColors.ink),
-                  backgroundColor: AppColors.card,
-                  side: const BorderSide(color: AppColors.line),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: generating || weatherAsync.isLoading ? null : _generate,
-              child: generating
-                  ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Text('Vestirme hoy'),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -108,48 +115,70 @@ class _WeatherCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: weatherAsync.when(
           loading: () => const Row(
             children: [
               SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2)),
               SizedBox(width: 12),
-              Text('Consultando el clima de hoy...'),
+              Expanded(child: Text('Consultando el clima de hoy...')),
             ],
           ),
           error: (error, stackTrace) => Row(
             children: [
-              const Icon(Icons.cloud_off, color: AppColors.inkSoft),
+              Icon(Icons.cloud_off, color: scheme.onSurfaceVariant),
               const SizedBox(width: 12),
               Expanded(child: Text(error.toString())),
-              IconButton(icon: const Icon(Icons.refresh), onPressed: onRetry),
+              IconButton(tooltip: 'Reintentar', icon: const Icon(Icons.refresh), onPressed: onRetry),
             ],
           ),
-          data: (weather) => Row(
-            children: [
-              const Icon(Icons.wb_sunny_outlined, size: 32, color: AppColors.accent),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${weather.tempC.round()}°C · ${weather.condition}',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.copyWith(color: AppColors.ink, fontWeight: FontWeight.w600),
-                    ),
-                    if (weather.city.isNotEmpty) Text(weather.city),
-                  ],
-                ),
-              ),
-              IconButton(icon: const Icon(Icons.refresh), onPressed: onRetry),
-            ],
+          data: (weather) => IntrinsicHeight(
+            child: Row(
+              children: [
+                _WeatherStat(label: 'Temperatura', value: '${weather.tempC.round()}°C'),
+                const VerticalDivider(width: 20),
+                _WeatherStat(label: 'Clima', value: weather.condition as String),
+                if ((weather.city as String).isNotEmpty) ...[
+                  const VerticalDivider(width: 20),
+                  _WeatherStat(label: 'Ciudad', value: weather.city as String),
+                ],
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _WeatherStat extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _WeatherStat({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: textTheme.bodySmall),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

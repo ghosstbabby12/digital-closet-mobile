@@ -4,9 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/api_exception.dart';
-import '../core/app_theme.dart';
 import '../models/garment.dart';
 import '../state/closet_provider.dart';
+import '../widgets/primary_button.dart';
 
 class AddGarmentScreen extends ConsumerStatefulWidget {
   const AddGarmentScreen({super.key});
@@ -98,6 +98,7 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('Nueva prenda')),
       body: SafeArea(
@@ -109,23 +110,22 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
               child: Container(
                 height: 220,
                 decoration: BoxDecoration(
-                  color: AppColors.card,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.line),
+                  color: scheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(20),
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: _image == null
-                    ? const Center(
+                    ? Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.add_a_photo, size: 36, color: AppColors.inkSoft),
-                            SizedBox(height: 8),
-                            Text('Toca para tomar o elegir una foto'),
+                            Icon(Icons.add_a_photo_outlined, size: 36, color: scheme.onSurfaceVariant),
+                            const SizedBox(height: 8),
+                            const Text('Toca para tomar o elegir una foto'),
                           ],
                         ),
                       )
-                    : Image.memory(_imageBytes!, fit: BoxFit.cover, width: double.infinity),
+                    : Image.memory(_imageBytes!, fit: BoxFit.contain, width: double.infinity),
               ),
             ),
             const SizedBox(height: 20),
@@ -158,19 +158,10 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
             ),
             if (_error != null) ...[
               const SizedBox(height: 14),
-              Text(_error!, style: const TextStyle(color: Colors.redAccent)),
+              Text(_error!, style: TextStyle(color: scheme.error)),
             ],
             const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _submitting ? null : _submit,
-              child: _submitting
-                  ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Text('Guardar prenda'),
-            ),
+            PrimaryButton(label: 'Guardar prenda', loading: _submitting, onPressed: _submit),
           ],
         ),
       ),
