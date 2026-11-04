@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/api_exception.dart';
+import '../core/image_upload.dart';
 import '../models/garment.dart';
 import '../state/dio_provider.dart';
 
@@ -34,14 +35,19 @@ class GarmentRepository {
         'color': color,
         'warmth': warmth.name,
         'name': name,
-        // Se envían los bytes (no la ruta) para que funcione también en web.
-        'image': MultipartFile.fromBytes(
-          await image.readAsBytes(),
-          filename: image.name,
-          contentType: image.mimeType != null ? DioMediaType.parse(image.mimeType!) : null,
-        ),
+        'image': await multipartFromImage(image),
       });
       final response = await _dio.post('/garments', data: formData);
+      return Garment.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw ApiException.fromDioError(e);
+    }
+  }
+
+  /// Genera (o recupera) la versión de la prenda con fondo transparente.
+  Future<Garment> createCutout(int id) async {
+    try {
+      final response = await _dio.post('/garments/$id/cutout');
       return Garment.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);

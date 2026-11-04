@@ -4,6 +4,7 @@ import '../widgets/floating_nav_bar.dart';
 import 'closet_screen.dart';
 import 'generate_outfit_screen.dart';
 import 'history_screen.dart';
+import 'try_on_screen.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -15,10 +16,11 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _index = 1;
 
-  static const _screens = [ClosetScreen(), GenerateOutfitScreen(), HistoryScreen()];
+  static const _screens = [ClosetScreen(), GenerateOutfitScreen(), TryOnScreen(), HistoryScreen()];
   static const _items = [
     FloatingNavItem(icon: Icons.checkroom_outlined, selectedIcon: Icons.checkroom, label: 'Clóset'),
     FloatingNavItem(icon: Icons.auto_awesome_outlined, selectedIcon: Icons.auto_awesome, label: 'Estilista'),
+    FloatingNavItem(icon: Icons.accessibility_new_outlined, selectedIcon: Icons.accessibility_new, label: 'Probador'),
     FloatingNavItem(icon: Icons.calendar_month_outlined, selectedIcon: Icons.calendar_month, label: 'Outfits'),
   ];
 

@@ -56,5 +56,5 @@ void main() {
 
     expect(container.read(themeModeProvider), ThemeMode.dark);
     expect(prefs.getString('theme_mode'), 'dark');
-  });
+  }, semanticsEnabled: false);
 }

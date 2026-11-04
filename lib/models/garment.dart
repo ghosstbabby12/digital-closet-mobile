@@ -47,6 +47,7 @@ class Garment {
   final String color;
   final WarmthLevel warmth;
   final String imageUrl;
+  final String? cutoutUrl;
   final DateTime createdAt;
 
   Garment({
@@ -56,6 +57,7 @@ class Garment {
     required this.color,
     required this.warmth,
     required this.imageUrl,
+    this.cutoutUrl,
     required this.createdAt,
   });
 
@@ -67,6 +69,7 @@ class Garment {
       color: json['color'] as String? ?? '',
       warmth: warmthFromString(json['warmth'] as String),
       imageUrl: json['image_url'] as String,
+      cutoutUrl: json['cutout_url'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
