@@ -56,47 +56,43 @@ GarmentShape? analyzeGarment(RgbaPixels pixels, {int alphaThreshold = 40}) {
   );
 }
 
-/// Silueta de la persona en la foto recortada. Las posiciones son fracciones
-/// del tamaño de la imagen.
+/// Silueta de una persona de pie y de frente, medida en su foto recortada.
+/// Las alturas son fracciones del alto de la imagen y los anchos y posiciones
+/// horizontales, fracciones de su ancho.
 class BodyShape {
   /// Ancho / alto de la imagen.
   final double imageAspect;
 
-  /// Fila de la coronilla y de los pies.
+  /// Coronilla y planta de los pies.
   final double top;
   final double bottom;
 
-  /// Tramo opaco central de cada fila (el cuerpo, sin brazos separados);
-  /// null en las filas vacías.
-  final List<({double left, double right})?> rows;
+  /// Eje vertical del cuerpo, tomado del centro de la cabeza.
+  final double centerX;
 
-  const BodyShape({required this.imageAspect, required this.top, required this.bottom, required this.rows});
+  /// Línea de los hombros y de la entrepierna.
+  final double shoulderY;
+  final double crotchY;
+
+  /// Ancho de los hombros y de la cadera.
+  final double shoulderWidth;
+  final double hipWidth;
+
+  const BodyShape({
+    required this.imageAspect,
+    required this.top,
+    required this.bottom,
+    required this.centerX,
+    required this.shoulderY,
+    required this.crotchY,
+    required this.shoulderWidth,
+    required this.hipWidth,
+  });
 
   double get height => bottom - top;
 
-  /// Tramo central a una altura relativa del cuerpo (0 = cabeza, 1 = pies).
-  ({double left, double right})? spanAt(double bodyFraction) {
-    final y = top + bodyFraction.clamp(0.0, 1.0) * height;
-    final index = (y * rows.length).floor().clamp(0, rows.length - 1);
-    for (var offset = 0; offset < rows.length; offset++) {
-      for (final i in [index - offset, index + offset]) {
-        if (i >= 0 && i < rows.length && rows[i] != null) return rows[i];
-      }
-    }
-    return null;
-  }
-
-  /// Ancho de los hombros: mediana del tramo central entre el 17 % y el 22 % del cuerpo.
-  double get shoulderWidth {
-    final widths = <double>[];
-    for (var f = 0.17; f <= 0.22; f += 0.01) {
-      final span = spanAt(f);
-      if (span != null) widths.add(span.right - span.left);
-    }
-    if (widths.isEmpty) return 0;
-    widths.sort();
-    return widths[widths.length ~/ 2];
-  }
+  /// Altura de la pretina de un pantalón de tiro medio: entre la cintura y la cadera.
+  double get waistY => shoulderY + 0.65 * (crotchY - shoulderY);
 }
 
 BodyShape? analyzeBody(RgbaPixels pixels, {int alphaThreshold = 128}) {
@@ -120,14 +116,16 @@ BodyShape? analyzeBody(RgbaPixels pixels, {int alphaThreshold = 128}) {
     }
   }
   if (firstRow == null || lastRow == null) return null;
+  final height = lastRow - firstRow + 1;
   // Una silueta muy pequeña no es una foto de cuerpo completo.
-  if (lastRow - firstRow < pixels.height * 0.3) return null;
+  if (height < pixels.height * 0.3) return null;
+  int rowAt(double bodyFraction) => (firstRow! + bodyFraction * height).round().clamp(firstRow, lastRow!);
 
-  // El centro del cuerpo se toma de la cabeza, que casi siempre está centrada.
-  final headRows = ((lastRow - firstRow) * 0.08).ceil().clamp(1, pixels.height);
+  // El eje del cuerpo se toma de la cabeza, que casi siempre está centrada;
+  // los brazos (por ejemplo, las manos en la cintura) no lo desplazan.
   var centerSum = 0.0;
   var centerCount = 0;
-  for (var y = firstRow; y < firstRow + headRows; y++) {
+  for (var y = firstRow; y <= rowAt(0.06); y++) {
     for (final (left, right) in spansByRow[y]) {
       centerSum += (left + right) / 2;
       centerCount++;
@@ -135,47 +133,87 @@ BodyShape? analyzeBody(RgbaPixels pixels, {int alphaThreshold = 128}) {
   }
   final center = centerSum / centerCount;
 
-  final rows = <({double left, double right})?>[];
-  for (final spans in spansByRow) {
-    if (spans.isEmpty) {
-      rows.add(null);
-      continue;
-    }
-    rows.add(_centralSpan(spans, center, maxGap: pixels.width * 0.25, width: pixels.width));
+  final rows = [for (final spans in spansByRow) _centralSpan(spans, center, maxGap: pixels.width * 0.25)];
+  int widthAt(int y) => rows[y] == null ? 0 : rows[y]!.$2 - rows[y]!.$1 + 1;
+
+  // Cuello: la fila más angosta entre la cabeza y los hombros.
+  var neckRow = rowAt(0.08);
+  for (var y = rowAt(0.08); y <= rowAt(0.25); y++) {
+    if (widthAt(y) > 0 && widthAt(y) < widthAt(neckRow)) neckRow = y;
   }
+  var headWidth = 0;
+  for (var y = firstRow; y < neckRow; y++) {
+    if (widthAt(y) > headWidth) headWidth = widthAt(y);
+  }
+
+  // Hombros: donde el cuerpo se ensancha claramente después del cuello.
+  var shoulderRow = rowAt(0.18);
+  for (var y = neckRow; y <= rowAt(0.32); y++) {
+    if (widthAt(y) >= widthAt(neckRow) * 2.2) {
+      shoulderRow = y;
+      break;
+    }
+  }
+
+  // Entrepierna: se sube desde los tobillos mientras el eje del cuerpo siga
+  // cayendo en el hueco entre las piernas. Se toleran cortes de pocas filas,
+  // que en una foto real son ruido del recorte (rodillas juntas, sombras).
+  var crotchRow = rowAt(0.5);
+  final ankleRow = rowAt(0.92);
+  if (_centerInGap(spansByRow[ankleRow], center)) {
+    final maxBreak = (height * 0.015).ceil();
+    var breakRows = 0;
+    for (var y = ankleRow; y >= rowAt(0.38); y--) {
+      if (_centerInGap(spansByRow[y], center)) {
+        crotchRow = y;
+        breakRows = 0;
+      } else if (++breakRows > maxBreak) {
+        break;
+      }
+    }
+  }
+
+  // Si los brazos van pegados al cuerpo, el ancho medido los incluye: se acota
+  // con el ancho de la cabeza, que guarda una proporción estable con los hombros.
+  // Se mide justo bajo la línea de los hombros, antes de que se separen los brazos.
+  final measuredShoulders = widthAt(shoulderRow + (height * 0.01).round());
+  final shoulders = headWidth > 0
+      ? measuredShoulders.clamp((headWidth * 1.5).round(), (headWidth * 2.6).round())
+      : measuredShoulders;
+  final hips = widthAt(crotchRow - (height * 0.03).round());
 
   return BodyShape(
     imageAspect: pixels.width / pixels.height,
     top: firstRow / pixels.height,
     bottom: (lastRow + 1) / pixels.height,
-    rows: rows,
+    centerX: (center + 0.5) / pixels.width,
+    shoulderY: shoulderRow / pixels.height,
+    crotchY: crotchRow / pixels.height,
+    shoulderWidth: shoulders / pixels.width,
+    hipWidth: (hips > 0 ? hips : shoulders) / pixels.width,
   );
 }
 
-/// Tramo de la fila que corresponde al cuerpo: el que contiene el centro. Si el
-/// centro cae en un hueco angosto (entre las piernas), se unen los dos tramos
-/// que lo rodean; si no, se usa el más cercano.
-({double left, double right}) _centralSpan(
-  List<(int, int)> spans,
-  double center, {
-  required double maxGap,
-  required int width,
-}) {
+bool _centerInGap(List<(int, int)> spans, double center) =>
+    spans.isNotEmpty && !spans.any((span) => span.$1 <= center && center <= span.$2);
+
+/// Tramo de la fila que corresponde al cuerpo: el que contiene el eje. Si el
+/// eje cae en un hueco angosto (entre las piernas), se unen los dos tramos que
+/// lo rodean; si no, se usa el más cercano.
+(int, int)? _centralSpan(List<(int, int)> spans, double center, {required double maxGap}) {
+  if (spans.isEmpty) return null;
   (int, int)? leftOfCenter, rightOfCenter;
   for (final span in spans) {
-    if (span.$1 <= center && center <= span.$2) {
-      return (left: span.$1 / width, right: (span.$2 + 1) / width);
-    }
+    if (span.$1 <= center && center <= span.$2) return span;
     if (span.$2 < center) leftOfCenter = span;
     if (span.$1 > center && rightOfCenter == null) rightOfCenter = span;
   }
   if (leftOfCenter != null && rightOfCenter != null && rightOfCenter.$1 - leftOfCenter.$2 <= maxGap) {
-    return (left: leftOfCenter.$1 / width, right: (rightOfCenter.$2 + 1) / width);
+    return (leftOfCenter.$1, rightOfCenter.$2);
   }
-  final nearest = [leftOfCenter, rightOfCenter].whereType<(int, int)>().reduce(
+  return [leftOfCenter, rightOfCenter].whereType<(int, int)>().reduce(
         (a, b) => (center - a.$2).abs() < (b.$1 - center).abs() ? a : b,
       );
-  return (left: nearest.$1 / width, right: (nearest.$2 + 1) / width);
 }
 
 /// Dónde colocar una prenda: centro horizontal y borde superior como fracción
@@ -188,30 +226,56 @@ class GarmentFit {
   const GarmentFit({required this.centerX, required this.top, required this.width});
 }
 
-/// Zona del cuerpo que cubre cada categoría (0 = cabeza, 1 = pies) y ancho
-/// máximo en múltiplos del ancho de hombros. Proporciones aproximadas de una
-/// persona de pie y de frente.
-const _zones = {
-  GarmentCategory.top: (start: 0.15, end: 0.50, maxShoulders: 2.4),
-  GarmentCategory.outerwear: (start: 0.14, end: 0.60, maxShoulders: 2.6),
-  GarmentCategory.dress: (start: 0.15, end: 0.78, maxShoulders: 2.4),
-  GarmentCategory.bottom: (start: 0.43, end: 0.97, maxShoulders: 1.6),
-  GarmentCategory.shoes: (start: 0.93, end: 1.0, maxShoulders: 1.4),
-};
+/// Orden de vestir, de abajo hacia arriba: el pantalón bajo la blusa y la chaqueta encima.
+int layerOrder(GarmentCategory category) => switch (category) {
+      GarmentCategory.bottom => 0,
+      GarmentCategory.shoes => 1,
+      GarmentCategory.dress => 2,
+      GarmentCategory.top => 3,
+      GarmentCategory.outerwear => 4,
+      GarmentCategory.accessory => 5,
+    };
 
-/// null si la categoría no tiene una zona fija (accesorios) o faltan medidas.
+/// null si la categoría no tiene una zona fija (accesorios).
 GarmentFit? fitGarment(GarmentCategory category, BodyShape body, GarmentShape garment) {
-  final zone = _zones[category];
-  final span = body.spanAt((zone?.start ?? 0) + ((zone?.end ?? 0) - (zone?.start ?? 0)) / 2);
-  if (zone == null || span == null || body.shoulderWidth <= 0) return null;
-
   // Se trabaja en unidades del alto de la imagen para respetar la proporción.
-  final targetHeight = (zone.end - zone.start) * body.height;
-  final maxWidth = zone.maxShoulders * body.shoulderWidth * body.imageAspect;
-  final width = (targetHeight / garment.aspect).clamp(0.0, maxWidth);
-  return GarmentFit(
-    centerX: (span.left + span.right) / 2,
-    top: body.top + zone.start * body.height,
-    width: width / body.imageAspect,
-  );
+  final aspect = body.imageAspect;
+  final shoulders = body.shoulderWidth * aspect;
+  final hips = body.hipWidth * aspect;
+  final collar = body.shoulderY - 0.03 * body.height;
+
+  // Las prendas de arriba se escalan por los hombros: en la foto de la prenda,
+  // la costura de los hombros ocupa cerca del 60 % del ancho (las mangas, el resto).
+  // El largo se limita para que no pasen de donde terminaría la prenda.
+  GarmentFit upper({required double widthFactor, required double maxBottom}) {
+    var width = shoulders * widthFactor;
+    final maxHeight = maxBottom - collar;
+    if (width * garment.aspect > maxHeight) width = maxHeight / garment.aspect;
+    return GarmentFit(centerX: body.centerX, top: collar, width: width / aspect);
+  }
+
+  switch (category) {
+    case GarmentCategory.top:
+      return upper(widthFactor: 1.65, maxBottom: body.crotchY + 0.10 * body.height);
+    case GarmentCategory.outerwear:
+      return upper(widthFactor: 1.75, maxBottom: body.top + 0.78 * body.height);
+    case GarmentCategory.dress:
+      return upper(widthFactor: 1.5, maxBottom: body.bottom);
+    case GarmentCategory.bottom:
+      // El pantalón se escala por el largo de las piernas, de la cintura al tobillo.
+      final top = body.waistY;
+      final length = body.bottom - 0.02 * body.height - top;
+      final width = (length / garment.aspect).clamp(0.0, hips * 1.6);
+      return GarmentFit(centerX: body.centerX, top: top, width: width / aspect);
+    case GarmentCategory.shoes:
+      final height = 0.07 * body.height;
+      final width = (height / garment.aspect).clamp(0.0, hips * 1.3);
+      return GarmentFit(
+        centerX: body.centerX,
+        top: body.bottom - width * garment.aspect,
+        width: width / aspect,
+      );
+    case GarmentCategory.accessory:
+      return null;
+  }
 }
