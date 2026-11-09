@@ -8,12 +8,14 @@ import '../core/app_theme.dart';
 import '../core/image_url.dart';
 import '../core/silhouette.dart';
 import '../models/garment.dart';
+import '../repositories/look_repository.dart';
 import '../state/body_photo_provider.dart';
 import '../state/closet_provider.dart';
 import '../state/try_on_shapes_provider.dart';
 import '../widgets/garment_card.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/screen_header.dart';
+import 'looks_screen.dart';
 
 const _minLayerWidth = 0.12;
 const _maxLayerWidth = 1.0;
@@ -78,6 +80,7 @@ class _TryOnScreenState extends ConsumerState<TryOnScreen> {
   final Set<int> _preparing = {};
   int? _selectedId;
   bool _uploading = false;
+  bool _generating = false;
   double _gestureStartWidth = 0;
   BodyShape? _body;
   String? _bodyUrl;
@@ -226,6 +229,29 @@ class _TryOnScreenState extends ConsumerState<TryOnScreen> {
     );
   }
 
+  /// Prendas que la IA de prueba sabe vestir; el calzado y los accesorios no.
+  static bool _canTryOn(Garment garment) =>
+      garment.category != GarmentCategory.shoes && garment.category != GarmentCategory.accessory;
+
+  /// Pide a la IA una foto realista con las prendas puestas, en orden de vestir.
+  Future<void> _generateLook() async {
+    final garmentIds = [
+      for (final layer in _layersInWearingOrder())
+        if (_canTryOn(layer.garment)) layer.garment.id,
+    ];
+    setState(() => _generating = true);
+    try {
+      final look = await ref.read(lookRepositoryProvider).generate(garmentIds);
+      ref.invalidate(looksProvider);
+      if (!mounted) return;
+      await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => LookScreen(look: look)));
+    } catch (error) {
+      _showError(error);
+    } finally {
+      if (mounted) setState(() => _generating = false);
+    }
+  }
+
   void _refitSelected() => _updateSelected((layer) => _fitted(layer.copyWith(autoFit: true)));
 
   /// Capas en orden de vestir (pantalón, blusa, chaqueta encima); dentro de la
@@ -274,6 +300,13 @@ class _TryOnScreenState extends ConsumerState<TryOnScreen> {
           ScreenHeader(
             title: 'Probador',
             actions: [
+              HeaderIconButton(
+                icon: Icons.photo_library_outlined,
+                tooltip: 'Mis looks',
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(builder: (_) => const LooksScreen()),
+                ),
+              ),
               if (photoUrl != null)
                 HeaderIconButton(
                   icon: Icons.person_outline,
@@ -417,6 +450,24 @@ class _TryOnScreenState extends ConsumerState<TryOnScreen> {
                     ),
             ),
           ),
+          if (_layers.any((layer) => _canTryOn(layer.garment))) ...[
+            const SizedBox(height: 10),
+            PrimaryButton(
+              label: _generating ? 'Creando tu look...' : 'Ver cómo me queda',
+              loading: _generating,
+              onPressed: _generateLook,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              [
+                'El servicio FASHN recibe tu foto y estas prendas y dibuja el look; tarda unos segundos por prenda.',
+                if (_layers.any((layer) => !_canTryOn(layer.garment)))
+                  'El calzado y los accesorios no se incluyen.',
+              ].join(' '),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
         ],
       ),
     );

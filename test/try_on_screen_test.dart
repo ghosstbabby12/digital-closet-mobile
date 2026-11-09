@@ -4,8 +4,11 @@ import 'dart:typed_data';
 import 'package:closet_ai/core/api_exception.dart';
 import 'package:closet_ai/core/silhouette.dart';
 import 'package:closet_ai/models/garment.dart';
+import 'package:closet_ai/models/look.dart';
 import 'package:closet_ai/repositories/body_photo_repository.dart';
 import 'package:closet_ai/repositories/garment_repository.dart';
+import 'package:closet_ai/repositories/look_repository.dart';
+import 'package:closet_ai/screens/looks_screen.dart';
 import 'package:closet_ai/screens/try_on_screen.dart';
 import 'package:closet_ai/state/body_photo_provider.dart';
 import 'package:closet_ai/state/closet_provider.dart';
@@ -16,6 +19,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Garment garment(int id, {String? cutout}) => Garment(
@@ -94,7 +98,28 @@ class FakeShapes implements ShapeLoader {
   Future<GarmentShape?> garment(String url) async => garmentShape;
 }
 
+class FakeLooks extends LookRepository {
+  FakeLooks() : super(Dio());
+  final List<List<int>> requests = [];
+  bool fail = false;
+
+  @override
+  Future<Look> generate(List<int> garmentIds) async {
+    requests.add(garmentIds);
+    if (fail) throw ApiException('Se acabaron los créditos de FASHN. Recarga para seguir.');
+    return Look(id: 1, imageUrl: 'https://example.invalid/look.png', garmentIds: garmentIds, createdAt: DateTime(2026));
+  }
+
+  @override
+  Future<List<Look>> list() async => [];
+}
+
+late FakeLooks looks;
+
 void main() {
+  // La app lo hace en main(); la pantalla del look muestra la fecha en español.
+  setUpAll(() => initializeDateFormatting('es'));
+
   Future<void> pumpScreen(
     WidgetTester tester,
     FakeGarments garments,
@@ -112,6 +137,7 @@ void main() {
           closetProvider.overrideWith((ref) => ClosetNotifier(garments)),
           bodyPhotoProvider.overrideWith((ref) => BodyPhotoNotifier(photo)),
           shapeLoaderProvider.overrideWithValue(shapes ?? FakeShapes()),
+          lookRepositoryProvider.overrideWithValue(looks = FakeLooks()),
         ],
         child: const MaterialApp(home: Scaffold(body: TryOnScreen())),
       ),
@@ -284,6 +310,95 @@ void main() {
 
       expect(find.byKey(layerKey), findsOneWidget);
       expect(find.byTooltip('Ajustar automáticamente'), findsNothing);
+    }, semanticsEnabled: false);
+  });
+
+  group('ver cómo me queda', () {
+    Garment jacket() => Garment(
+          id: 2,
+          name: 'Chaqueta',
+          category: GarmentCategory.outerwear,
+          color: 'gris',
+          warmth: WarmthLevel.heavy,
+          imageUrl: 'https://example.invalid/2.jpg',
+          cutoutUrl: 'https://example.invalid/2.png',
+          createdAt: DateTime(2026),
+        );
+
+    Future<void> wearBoth(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 1800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final garments = FakeGarments([garment(1, cutout: 'https://example.invalid/1.png'), jacket()]);
+      await pumpScreen(tester, garments, FakeBodyPhoto('https://example.invalid/yo.png'));
+      expect(find.text('Ver cómo me queda'), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('garment-2')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(garmentKey));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('envía las prendas en orden de vestir y abre el resultado', (tester) async {
+      await wearBoth(tester);
+
+      expect(find.textContaining('FASHN'), findsOneWidget);
+      await tester.tap(find.text('Ver cómo me queda'));
+      await tester.pumpAndSettle();
+
+      // La blusa (1) va antes que la chaqueta (2), aunque la chaqueta se puso primero.
+      expect(looks.requests, [
+        [1, 2],
+      ]);
+      expect(find.byType(LookScreen), findsOneWidget);
+    }, semanticsEnabled: false);
+
+    testWidgets('el calzado no se envía ni muestra el botón por sí solo', (tester) async {
+      final shoes = Garment(
+        id: 3,
+        name: 'Tenis',
+        category: GarmentCategory.shoes,
+        color: 'blanco',
+        warmth: WarmthLevel.light,
+        imageUrl: 'https://example.invalid/3.jpg',
+        cutoutUrl: 'https://example.invalid/3.png',
+        createdAt: DateTime(2026),
+      );
+      tester.view.physicalSize = const Size(800, 1800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await pumpScreen(
+        tester,
+        FakeGarments([garment(1, cutout: 'https://example.invalid/1.png'), shoes]),
+        FakeBodyPhoto('https://example.invalid/yo.png'),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('garment-3')));
+      await tester.pumpAndSettle();
+      expect(find.text('Ver cómo me queda'), findsNothing);
+
+      await tester.tap(find.byKey(garmentKey));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('El calzado y los accesorios no se incluyen'), findsOneWidget);
+      await tester.tap(find.text('Ver cómo me queda'));
+      await tester.pumpAndSettle();
+
+      expect(looks.requests, [
+        [1],
+      ]);
+    }, semanticsEnabled: false);
+
+    testWidgets('si falla, muestra el motivo y deja reintentar', (tester) async {
+      await wearBoth(tester);
+      looks.fail = true;
+
+      await tester.tap(find.text('Ver cómo me queda'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('Se acabaron los créditos de FASHN. Recarga para seguir.'), findsOneWidget);
+      expect(find.byType(LookScreen), findsNothing);
+      final button = tester.widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Ver cómo me queda'));
+      expect(button.onPressed, isNotNull);
     }, semanticsEnabled: false);
   });
 }
