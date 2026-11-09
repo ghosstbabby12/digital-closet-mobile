@@ -1,4 +1,8 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:closet_ai/core/api_exception.dart';
+import 'package:closet_ai/core/silhouette.dart';
 import 'package:closet_ai/models/garment.dart';
 import 'package:closet_ai/repositories/body_photo_repository.dart';
 import 'package:closet_ai/repositories/garment_repository.dart';
@@ -6,6 +10,7 @@ import 'package:closet_ai/screens/try_on_screen.dart';
 import 'package:closet_ai/state/body_photo_provider.dart';
 import 'package:closet_ai/state/closet_provider.dart';
 import 'package:closet_ai/state/theme_provider.dart';
+import 'package:closet_ai/state/try_on_shapes_provider.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -55,8 +60,47 @@ class FakeBodyPhoto extends BodyPhotoRepository {
   Future<void> delete() async => url = null;
 }
 
+/// Silueta de 100x200 con la cabeza centrada; los hombros miden 40 px.
+BodyShape testBody() {
+  final data = Uint8List(100 * 200 * 4);
+  void box(int x0, int y0, int x1, int y1) {
+    for (var y = y0; y < y1; y++) {
+      for (var x = x0; x < x1; x++) {
+        data[(y * 100 + x) * 4 + 3] = 255;
+      }
+    }
+  }
+
+  box(40, 10, 60, 30);
+  box(30, 40, 70, 110);
+  box(32, 110, 48, 190);
+  box(52, 110, 68, 190);
+  return analyzeBody(RgbaPixels(data, 100, 200))!;
+}
+
+class FakeShapes implements ShapeLoader {
+  FakeShapes({this.bodyShape, this.garmentShape});
+  final BodyShape? bodyShape;
+  final GarmentShape? garmentShape;
+  final Completer<void> bodyGate = Completer<void>()..complete();
+
+  @override
+  Future<BodyShape?> body(String url) async {
+    await bodyGate.future;
+    return bodyShape;
+  }
+
+  @override
+  Future<GarmentShape?> garment(String url) async => garmentShape;
+}
+
 void main() {
-  Future<void> pumpScreen(WidgetTester tester, FakeGarments garments, FakeBodyPhoto photo) async {
+  Future<void> pumpScreen(
+    WidgetTester tester,
+    FakeGarments garments,
+    FakeBodyPhoto photo, {
+    ShapeLoader? shapes,
+  }) async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
     await tester.pumpWidget(
@@ -67,6 +111,7 @@ void main() {
           bodyPhotoRepositoryProvider.overrideWithValue(photo),
           closetProvider.overrideWith((ref) => ClosetNotifier(garments)),
           bodyPhotoProvider.overrideWith((ref) => BodyPhotoNotifier(photo)),
+          shapeLoaderProvider.overrideWithValue(shapes ?? FakeShapes()),
         ],
         child: const MaterialApp(home: Scaffold(body: TryOnScreen())),
       ),
@@ -147,4 +192,66 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(layerKey), findsNothing);
   }, semanticsEnabled: false);
+
+  group('ajuste automático', () {
+    const shirt = GarmentShape(left: 0.1, top: 0.2, right: 0.9, bottom: 0.8, aspect: 0.6);
+
+    Positioned layerPosition(WidgetTester tester) => tester.widget<Positioned>(
+          find.ancestor(of: find.byKey(layerKey), matching: find.byType(Positioned)).first,
+        );
+
+    Future<void> addShirt(WidgetTester tester) async {
+      final garments = FakeGarments([garment(1, cutout: 'https://example.invalid/1.png')]);
+      await pumpScreen(
+        tester,
+        garments,
+        FakeBodyPhoto('https://example.invalid/yo.png'),
+        shapes: FakeShapes(bodyShape: testBody(), garmentShape: shirt),
+      );
+      await tester.tap(find.byKey(garmentKey));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('coloca la prenda sobre los hombros, centrada en el cuerpo', (tester) async {
+      await addShirt(tester);
+
+      final position = layerPosition(tester);
+      final stage = tester.getSize(find.byType(LayoutBuilder).first);
+      final layerCenter = position.left! + position.width! / 2;
+      // El cuerpo de la silueta está centrado en la foto, y la foto en el escenario.
+      expect(layerCenter, closeTo(stage.width / 2, 1));
+      // Sin bordes vacíos: el alto sale de la zona visible de la prenda.
+      expect(tester.getSize(find.byKey(layerKey)).height, closeTo(position.width! * shirt.aspect + 3, 2));
+      expect(find.byTooltip('Ajustar automáticamente'), findsOneWidget);
+    }, semanticsEnabled: false);
+
+    testWidgets('lo que se mueve a mano no se reacomoda, salvo con el botón', (tester) async {
+      await addShirt(tester);
+      final fitted = layerPosition(tester);
+
+      await tester.drag(find.byKey(layerKey), const Offset(40, 60));
+      await tester.pumpAndSettle();
+      expect(layerPosition(tester).top, greaterThan(fitted.top!));
+
+      await tester.tap(find.byTooltip('Ajustar automáticamente'));
+      await tester.pumpAndSettle();
+      expect(layerPosition(tester).top, closeTo(fitted.top!, 0.01));
+      expect(layerPosition(tester).left, closeTo(fitted.left!, 0.01));
+    }, semanticsEnabled: false);
+
+    testWidgets('si no se puede medir la foto, la prenda queda a mano como antes', (tester) async {
+      final garments = FakeGarments([garment(1, cutout: 'https://example.invalid/1.png')]);
+      await pumpScreen(
+        tester,
+        garments,
+        FakeBodyPhoto('https://example.invalid/yo.png'),
+        shapes: FakeShapes(garmentShape: shirt),
+      );
+      await tester.tap(find.byKey(garmentKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(layerKey), findsOneWidget);
+      expect(find.byTooltip('Ajustar automáticamente'), findsNothing);
+    }, semanticsEnabled: false);
+  });
 }

@@ -6,9 +6,11 @@ import 'package:image_picker/image_picker.dart';
 import '../core/api_exception.dart';
 import '../core/app_theme.dart';
 import '../core/image_url.dart';
+import '../core/silhouette.dart';
 import '../models/garment.dart';
 import '../state/body_photo_provider.dart';
 import '../state/closet_provider.dart';
+import '../state/try_on_shapes_provider.dart';
 import '../widgets/garment_card.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/screen_header.dart';
@@ -24,7 +26,21 @@ class TryOnLayer {
   final double top;
   final double width;
 
-  const TryOnLayer({required this.garment, required this.centerX, required this.top, required this.width});
+  /// Zona visible del recorte; null mientras no se haya medido.
+  final GarmentShape? shape;
+
+  /// true mientras el usuario no la haya movido ni cambiado de tamaño: así el
+  /// ajuste automático no deshace sus cambios.
+  final bool autoFit;
+
+  const TryOnLayer({
+    required this.garment,
+    required this.centerX,
+    required this.top,
+    required this.width,
+    this.shape,
+    this.autoFit = true,
+  });
 
   /// Posición inicial aproximada según la parte del cuerpo donde va la prenda.
   factory TryOnLayer.initial(Garment garment) {
@@ -39,11 +55,14 @@ class TryOnLayer {
     return TryOnLayer(garment: garment, centerX: 0.5, top: top, width: width);
   }
 
-  TryOnLayer copyWith({double? centerX, double? top, double? width}) => TryOnLayer(
+  TryOnLayer copyWith({double? centerX, double? top, double? width, GarmentShape? shape, bool? autoFit}) =>
+      TryOnLayer(
         garment: garment,
         centerX: centerX ?? this.centerX,
         top: top ?? this.top,
         width: width ?? this.width,
+        shape: shape ?? this.shape,
+        autoFit: autoFit ?? this.autoFit,
       );
 }
 
@@ -60,6 +79,9 @@ class _TryOnScreenState extends ConsumerState<TryOnScreen> {
   int? _selectedId;
   bool _uploading = false;
   double _gestureStartWidth = 0;
+  BodyShape? _body;
+  String? _bodyUrl;
+  Size? _stageSize;
 
   void _showError(Object error) {
     if (!mounted) return;
@@ -145,12 +167,66 @@ class _TryOnScreenState extends ConsumerState<TryOnScreen> {
         _layers.add(TryOnLayer.initial(ready));
         _selectedId = ready.id;
       });
+      _measureGarment(ready);
     } catch (error) {
       _showError(error);
     } finally {
       if (mounted) setState(() => _preparing.remove(garment.id));
     }
   }
+
+  /// Mide la silueta de la foto una vez y recoloca las prendas que no se han movido a mano.
+  void _measureBody(String url) {
+    if (_bodyUrl == url) return;
+    _bodyUrl = url;
+    _body = null;
+    ref.read(shapeLoaderProvider).body(fullImageUrl(url)).then((body) {
+      if (!mounted || _bodyUrl != url || body == null) return;
+      setState(() {
+        _body = body;
+        for (var i = 0; i < _layers.length; i++) {
+          if (_layers[i].autoFit) _layers[i] = _fitted(_layers[i]);
+        }
+      });
+    });
+  }
+
+  /// Mide la zona visible de la prenda y, si sigue en ajuste automático, la coloca.
+  Future<void> _measureGarment(Garment garment) async {
+    final shape = await ref.read(shapeLoaderProvider).garment(fullImageUrl(garment.cutoutUrl!));
+    if (!mounted || shape == null) return;
+    final index = _layers.indexWhere((layer) => layer.garment.id == garment.id);
+    if (index == -1) return;
+    setState(() {
+      final measured = _layers[index].copyWith(shape: shape);
+      _layers[index] = measured.autoFit ? _fitted(measured) : measured;
+    });
+  }
+
+  /// Posición automática de la capa sobre la silueta; la deja igual si faltan medidas.
+  TryOnLayer _fitted(TryOnLayer layer) {
+    final body = _body;
+    final shape = layer.shape;
+    final stage = _stageSize;
+    if (body == null || shape == null || stage == null) return layer;
+    final fit = fitGarment(layer.garment.category, body, shape);
+    if (fit == null) return layer;
+
+    // La foto se muestra completa (BoxFit.contain) y centrada en el escenario.
+    final stageAspect = stage.width / stage.height;
+    final photoWidth = stageAspect > body.imageAspect ? body.imageAspect / stageAspect : 1.0;
+    final photoHeight = stageAspect > body.imageAspect ? 1.0 : stageAspect / body.imageAspect;
+    final photoLeft = (1 - photoWidth) / 2;
+    final photoTop = (1 - photoHeight) / 2;
+    return layer.copyWith(
+      centerX: photoLeft + fit.centerX * photoWidth,
+      top: photoTop + fit.top * photoHeight,
+      width: (fit.width * photoWidth).clamp(_minLayerWidth, _maxLayerWidth),
+      autoFit: true,
+    );
+  }
+
+  void _refitSelected() => _updateSelected((layer) => _fitted(layer.copyWith(autoFit: true)));
 
   /// Selecciona una capa y la trae al frente.
   void _select(int garmentId) {
@@ -202,7 +278,11 @@ class _TryOnScreenState extends ConsumerState<TryOnScreen> {
                 message: 'No se pudo cargar tu foto:\n$error',
                 onRetry: () => ref.read(bodyPhotoProvider.notifier).load(),
               ),
-              data: (url) => url == null ? _emptyState() : _dressingRoom(url),
+              data: (url) {
+                if (url == null) return _emptyState();
+                _measureBody(url);
+                return _dressingRoom(url);
+              },
             ),
           ),
         ],
@@ -293,9 +373,16 @@ class _TryOnScreenState extends ConsumerState<TryOnScreen> {
                           max: _maxLayerWidth,
                           value: selected.width,
                           semanticFormatterCallback: (value) => 'Tamaño ${(value * 100).round()}%',
-                          onChanged: (value) => _updateSelected((layer) => layer.copyWith(width: value)),
+                          onChanged: (value) =>
+                              _updateSelected((layer) => layer.copyWith(width: value, autoFit: false)),
                         ),
                       ),
+                      if (_body != null && selected.shape != null)
+                        IconButton(
+                          tooltip: 'Ajustar automáticamente',
+                          icon: const Icon(Icons.auto_fix_high),
+                          onPressed: _refitSelected,
+                        ),
                       IconButton(
                         tooltip: 'Quitar prenda',
                         icon: const Icon(Icons.delete_outline),
@@ -333,6 +420,7 @@ class _TryOnScreenState extends ConsumerState<TryOnScreen> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final size = constraints.biggest;
+            _stageSize = size;
             return Stack(
               fit: StackFit.expand,
               children: [
@@ -382,6 +470,7 @@ class _TryOnScreenState extends ConsumerState<TryOnScreen> {
                 width: details.pointerCount > 1
                     ? (_gestureStartWidth * details.scale).clamp(_minLayerWidth, _maxLayerWidth)
                     : current.width,
+                autoFit: false,
               )),
           child: Container(
             decoration: BoxDecoration(
@@ -391,14 +480,40 @@ class _TryOnScreenState extends ConsumerState<TryOnScreen> {
               ),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Image.network(
-              fullImageUrl(layer.garment.cutoutUrl!),
-              fit: BoxFit.fitWidth,
-              errorBuilder: (context, error, stackTrace) => SizedBox(
-                height: width,
-                child: const Center(child: Icon(Icons.broken_image_outlined)),
-              ),
-            ),
+            child: _garmentImage(layer, width),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Imagen de la prenda; ya medida, se muestra solo su zona visible, sin bordes vacíos.
+  Widget _garmentImage(TryOnLayer layer, double width) {
+    final url = fullImageUrl(layer.garment.cutoutUrl!);
+    Widget errorBuilder(BuildContext context, Object error, StackTrace? stackTrace) => SizedBox(
+          height: width,
+          child: const Center(child: Icon(Icons.broken_image_outlined)),
+        );
+    final shape = layer.shape;
+    if (shape == null) {
+      return Image.network(url, fit: BoxFit.fitWidth, errorBuilder: errorBuilder);
+    }
+    final height = width * shape.aspect;
+    final fullWidth = width / (shape.right - shape.left);
+    final fullHeight = height / (shape.bottom - shape.top);
+    return SizedBox(
+      width: width,
+      height: height,
+      child: ClipRect(
+        child: OverflowBox(
+          alignment: Alignment.topLeft,
+          minWidth: fullWidth,
+          maxWidth: fullWidth,
+          minHeight: fullHeight,
+          maxHeight: fullHeight,
+          child: Transform.translate(
+            offset: Offset(-shape.left * fullWidth, -shape.top * fullHeight),
+            child: Image.network(url, fit: BoxFit.fill, errorBuilder: errorBuilder),
           ),
         ),
       ),
