@@ -40,6 +40,25 @@ GarmentCategory categoryFromString(String value) =>
 WarmthLevel warmthFromString(String value) =>
     WarmthLevel.values.firstWhere((e) => e.name == value);
 
+/// Datos propuestos a partir de la foto de una prenda.
+class GarmentSuggestion {
+  final String name;
+  final String color;
+  final GarmentCategory category;
+  final WarmthLevel warmth;
+
+  GarmentSuggestion({required this.name, required this.color, required this.category, required this.warmth});
+
+  factory GarmentSuggestion.fromJson(Map<String, dynamic> json) {
+    return GarmentSuggestion(
+      name: json['name'] as String,
+      color: json['color'] as String,
+      category: categoryFromString(json['category'] as String),
+      warmth: warmthFromString(json['warmth'] as String),
+    );
+  }
+}
+
 class Garment {
   final int id;
   final String name;

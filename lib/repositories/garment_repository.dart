@@ -44,6 +44,17 @@ class GarmentRepository {
     }
   }
 
+  /// Propone los datos de una prenda a partir de su foto, sin guardar nada.
+  Future<GarmentSuggestion> suggest(XFile image) async {
+    try {
+      final formData = FormData.fromMap({'image': await multipartFromImage(image)});
+      final response = await _dio.post('/garments/suggest', data: formData);
+      return GarmentSuggestion.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw ApiException.fromDioError(e);
+    }
+  }
+
   /// Genera (o recupera) la versión de la prenda con fondo transparente.
   Future<Garment> createCutout(int id) async {
     try {

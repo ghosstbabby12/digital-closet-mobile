@@ -5,11 +5,14 @@ import 'package:image_picker/image_picker.dart';
 
 import '../core/api_exception.dart';
 import '../models/garment.dart';
+import '../repositories/garment_repository.dart';
 import '../state/closet_provider.dart';
 import '../widgets/primary_button.dart';
 
 class AddGarmentScreen extends ConsumerStatefulWidget {
-  const AddGarmentScreen({super.key});
+  final ImagePicker? picker;
+
+  const AddGarmentScreen({super.key, this.picker});
 
   @override
   ConsumerState<AddGarmentScreen> createState() => _AddGarmentScreenState();
@@ -24,6 +27,12 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
   Uint8List? _imageBytes;
   bool _submitting = false;
   String? _error;
+  bool _categoryChosen = false;
+  bool _warmthChosen = false;
+  bool _analyzing = false;
+  String? _autofillStatus;
+  // Identifica el último análisis, para ignorar el de una foto ya reemplazada.
+  int _analysisId = 0;
 
   @override
   void dispose() {
@@ -33,14 +42,44 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
   }
 
   Future<void> _pickImage(ImageSource source) async {
-    final picked = await ImagePicker().pickImage(source: source, imageQuality: 85);
+    final picked = await (widget.picker ?? ImagePicker()).pickImage(source: source, imageQuality: 85);
     if (picked != null) {
       final bytes = await picked.readAsBytes();
       setState(() {
         _image = picked;
         _imageBytes = bytes;
       });
+      _autofill(picked);
     }
+  }
+
+  /// Llena los datos desde la foto sin pisar lo que el usuario ya escribió o eligió.
+  Future<void> _autofill(XFile image) async {
+    final analysisId = ++_analysisId;
+    setState(() {
+      _analyzing = true;
+      _autofillStatus = null;
+    });
+    String status;
+    GarmentSuggestion? suggestion;
+    try {
+      suggestion = await ref.read(garmentRepositoryProvider).suggest(image);
+      status = 'Revisa los datos antes de guardar.';
+    } on ApiException catch (e) {
+      status = '${e.message} Puedes llenar los datos a mano.';
+    } catch (_) {
+      status = 'No se pudo analizar la foto. Puedes llenar los datos a mano.';
+    }
+    if (!mounted || analysisId != _analysisId) return;
+    setState(() {
+      _analyzing = false;
+      _autofillStatus = status;
+      if (suggestion == null) return;
+      if (_nameController.text.trim().isEmpty) _nameController.text = suggestion.name;
+      if (_colorController.text.trim().isEmpty) _colorController.text = suggestion.color;
+      if (!_categoryChosen) _category = suggestion.category;
+      if (!_warmthChosen) _warmth = suggestion.warmth;
+    });
   }
 
   void _showImageSourceSheet() {
@@ -128,6 +167,23 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
                     : Image.memory(_imageBytes!, fit: BoxFit.contain, width: double.infinity),
               ),
             ),
+            const SizedBox(height: 10),
+            if (_analyzing)
+              const Row(
+                children: [
+                  SizedBox(height: 14, width: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                  SizedBox(width: 10),
+                  Expanded(child: Text('Completando los datos...')),
+                ],
+              )
+            else if (_autofillStatus != null)
+              Text(_autofillStatus!)
+            else
+              Text(
+                'Para llenar los datos solos, la foto se envía a Google Gemini, y Google puede '
+                'usarla para mejorar sus productos. Usa fotos de la prenda sola, sin personas.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             const SizedBox(height: 20),
             TextField(
               controller: _nameController,
@@ -140,21 +196,30 @@ class _AddGarmentScreenState extends ConsumerState<AddGarmentScreen> {
             ),
             const SizedBox(height: 14),
             DropdownButtonFormField<GarmentCategory>(
+              // La clave recrea el campo cuando el autocompletado cambia el valor.
+              key: ValueKey(_category),
               initialValue: _category,
               decoration: const InputDecoration(labelText: 'Categoría'),
               items: GarmentCategory.values
                   .map((c) => DropdownMenuItem(value: c, child: Text(c.label)))
                   .toList(),
-              onChanged: (value) => setState(() => _category = value!),
+              onChanged: (value) => setState(() {
+                _category = value!;
+                _categoryChosen = true;
+              }),
             ),
             const SizedBox(height: 14),
             DropdownButtonFormField<WarmthLevel>(
+              key: ValueKey(_warmth),
               initialValue: _warmth,
               decoration: const InputDecoration(labelText: 'Nivel de abrigo'),
               items: WarmthLevel.values
                   .map((w) => DropdownMenuItem(value: w, child: Text(w.label)))
                   .toList(),
-              onChanged: (value) => setState(() => _warmth = value!),
+              onChanged: (value) => setState(() {
+                _warmth = value!;
+                _warmthChosen = true;
+              }),
             ),
             if (_error != null) ...[
               const SizedBox(height: 14),
