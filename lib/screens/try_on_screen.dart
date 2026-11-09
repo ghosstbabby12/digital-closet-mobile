@@ -228,6 +228,17 @@ class _TryOnScreenState extends ConsumerState<TryOnScreen> {
 
   void _refitSelected() => _updateSelected((layer) => _fitted(layer.copyWith(autoFit: true)));
 
+  /// Capas en orden de vestir (pantalón, blusa, chaqueta encima); dentro de la
+  /// misma categoría manda el orden de [_layers], donde la seleccionada va al final.
+  List<TryOnLayer> _layersInWearingOrder() {
+    final indexed = _layers.indexed.toList()
+      ..sort((a, b) {
+        final byCategory = layerOrder(a.$2.garment.category).compareTo(layerOrder(b.$2.garment.category));
+        return byCategory != 0 ? byCategory : a.$1.compareTo(b.$1);
+      });
+    return [for (final (_, layer) in indexed) layer];
+  }
+
   /// Selecciona una capa y la trae al frente.
   void _select(int garmentId) {
     setState(() {
@@ -436,7 +447,7 @@ class _TryOnScreenState extends ConsumerState<TryOnScreen> {
                     ),
                   ),
                 ),
-                for (final layer in _layers) _layerWidget(layer, size),
+                for (final layer in _layersInWearingOrder()) _layerWidget(layer, size),
                 if (_uploading) const Center(child: CircularProgressIndicator()),
               ],
             );

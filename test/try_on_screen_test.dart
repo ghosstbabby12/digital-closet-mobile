@@ -239,6 +239,38 @@ void main() {
       expect(layerPosition(tester).left, closeTo(fitted.left!, 0.01));
     }, semanticsEnabled: false);
 
+    testWidgets('la chaqueta queda sobre la blusa aunque se agregue antes', (tester) async {
+      final jacket = Garment(
+        id: 2,
+        name: 'Chaqueta',
+        category: GarmentCategory.outerwear,
+        color: 'gris',
+        warmth: WarmthLevel.heavy,
+        imageUrl: 'https://example.invalid/2.jpg',
+        cutoutUrl: 'https://example.invalid/2.png',
+        createdAt: DateTime(2026),
+      );
+      final garments = FakeGarments([garment(1, cutout: 'https://example.invalid/1.png'), jacket]);
+      await pumpScreen(
+        tester,
+        garments,
+        FakeBodyPhoto('https://example.invalid/yo.png'),
+        shapes: FakeShapes(bodyShape: testBody(), garmentShape: shirt),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('garment-2')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(garmentKey));
+      await tester.pumpAndSettle();
+
+      // En un Stack, lo que se dibuja después queda encima.
+      final order = tester
+          .widgetList<GestureDetector>(find.byWidgetPredicate((w) => w.key.toString().contains('layer-')))
+          .map((w) => (w.key! as ValueKey<String>).value)
+          .toList();
+      expect(order, ['layer-1', 'layer-2']);
+    }, semanticsEnabled: false);
+
     testWidgets('si no se puede medir la foto, la prenda queda a mano como antes', (tester) async {
       final garments = FakeGarments([garment(1, cutout: 'https://example.invalid/1.png')]);
       await pumpScreen(
