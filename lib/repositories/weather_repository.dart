@@ -17,6 +17,15 @@ class WeatherRepository {
       throw ApiException.fromDioError(e);
     }
   }
+
+  Future<List<City>> searchCities(String query) async {
+    try {
+      final response = await _dio.get('/weather/cities', queryParameters: {'q': query});
+      return (response.data as List).map((json) => City.fromJson(json as Map<String, dynamic>)).toList();
+    } on DioException catch (e) {
+      throw ApiException.fromDioError(e);
+    }
+  }
 }
 
 final weatherRepositoryProvider = Provider<WeatherRepository>((ref) {

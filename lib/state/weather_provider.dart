@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 
 import '../models/weather.dart';
 import '../repositories/weather_repository.dart';
+import 'city_provider.dart';
 
 final currentPositionProvider = FutureProvider<Position>((ref) async {
   final serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -24,8 +25,16 @@ final currentPositionProvider = FutureProvider<Position>((ref) async {
   return Geolocator.getCurrentPosition();
 });
 
-final weatherProvider = FutureProvider.autoDispose<Weather>((ref) async {
+/// Coordenadas para el clima: la ciudad elegida o, si no hay, el GPS.
+final weatherCoordinatesProvider = FutureProvider.autoDispose<({double lat, double lon})>((ref) async {
+  final city = ref.watch(selectedCityProvider);
+  if (city != null) return (lat: city.lat, lon: city.lon);
   final position = await ref.watch(currentPositionProvider.future);
+  return (lat: position.latitude, lon: position.longitude);
+});
+
+final weatherProvider = FutureProvider.autoDispose<Weather>((ref) async {
+  final coordinates = await ref.watch(weatherCoordinatesProvider.future);
   final repository = ref.read(weatherRepositoryProvider);
-  return repository.current(lat: position.latitude, lon: position.longitude);
+  return repository.current(lat: coordinates.lat, lon: coordinates.lon);
 });

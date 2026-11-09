@@ -5,8 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../core/api_exception.dart';
 import '../core/app_theme.dart';
 import '../core/constants.dart';
+import '../models/weather.dart';
+import '../state/city_provider.dart';
 import '../state/outfit_provider.dart';
 import '../state/weather_provider.dart';
+import '../widgets/city_search_sheet.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/screen_header.dart';
 
@@ -21,18 +24,20 @@ class _GenerateOutfitScreenState extends ConsumerState<GenerateOutfitScreen> {
   String _occasion = occasionOptions.first;
 
   Future<void> _generate() async {
-    final position = await ref.read(currentPositionProvider.future);
+    // Las mismas coordenadas del clima que se muestra: la ciudad elegida o el GPS.
+    final coordinates = await ref.read(weatherCoordinatesProvider.future);
     if (!mounted) return;
     await ref.read(outfitGenerateProvider.notifier).generate(
           occasion: _occasion,
-          lat: position.latitude,
-          lon: position.longitude,
+          lat: coordinates.lat,
+          lon: coordinates.lon,
         );
   }
 
   @override
   Widget build(BuildContext context) {
     final weatherAsync = ref.watch(weatherProvider);
+    final city = ref.watch(selectedCityProvider);
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -72,7 +77,13 @@ class _GenerateOutfitScreenState extends ConsumerState<GenerateOutfitScreen> {
                   style: textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant),
                 ),
                 const SizedBox(height: 22),
-                _WeatherCard(weatherAsync: weatherAsync, onRetry: () => ref.invalidate(weatherProvider)),
+                _LocationRow(city: city, onChange: () => showCitySearchSheet(context)),
+                const SizedBox(height: 8),
+                _WeatherCard(
+                  weatherAsync: weatherAsync,
+                  cityName: city?.name,
+                  onRetry: () => ref.invalidate(weatherProvider),
+                ),
                 const SizedBox(height: 26),
                 Text('Ocasión', style: textTheme.titleLarge),
                 const SizedBox(height: 10),
@@ -107,11 +118,39 @@ class _GenerateOutfitScreenState extends ConsumerState<GenerateOutfitScreen> {
   }
 }
 
+class _LocationRow extends StatelessWidget {
+  final City? city;
+  final VoidCallback onChange;
+
+  const _LocationRow({required this.city, required this.onChange});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Icon(city == null ? Icons.my_location : Icons.location_on_outlined, size: 18, color: scheme.primary),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            city?.label ?? 'Mi ubicación actual',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: scheme.onSurface),
+          ),
+        ),
+        TextButton(onPressed: onChange, child: const Text('Cambiar ciudad')),
+      ],
+    );
+  }
+}
+
 class _WeatherCard extends StatelessWidget {
   final AsyncValue weatherAsync;
+  final String? cityName;
   final VoidCallback onRetry;
 
-  const _WeatherCard({required this.weatherAsync, required this.onRetry});
+  const _WeatherCard({required this.weatherAsync, required this.cityName, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -141,9 +180,11 @@ class _WeatherCard extends StatelessWidget {
                 _WeatherStat(label: 'Temperatura', value: '${weather.tempC.round()}°C'),
                 const VerticalDivider(width: 20),
                 _WeatherStat(label: 'Clima', value: weather.condition as String),
-                if ((weather.city as String).isNotEmpty) ...[
+                // Con una ciudad elegida se muestra su nombre; OpenWeather a veces
+                // devuelve el de un barrio o una estación cercana.
+                if ((cityName ?? weather.city as String).isNotEmpty) ...[
                   const VerticalDivider(width: 20),
-                  _WeatherStat(label: 'Ciudad', value: weather.city as String),
+                  _WeatherStat(label: 'Ciudad', value: cityName ?? weather.city as String),
                 ],
               ],
             ),
