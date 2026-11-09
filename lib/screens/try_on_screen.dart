@@ -459,11 +459,14 @@ class _TryOnScreenState extends ConsumerState<TryOnScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              [
-                'El servicio FASHN recibe tu foto y estas prendas y dibuja el look; tarda unos segundos por prenda.',
-                if (_layers.any((layer) => !_canTryOn(layer.garment)))
-                  'El calzado y los accesorios no se incluyen.',
-              ].join(' '),
+              _generating
+                  ? 'Probando ${_layers.where((layer) => _canTryOn(layer.garment)).length} prenda(s), '
+                      'una tras otra: unos 10 segundos por prenda.'
+                  : [
+                      'El servicio FASHN recibe tu foto y estas prendas y dibuja el look; tarda unos segundos por prenda.',
+                      if (_layers.any((layer) => !_canTryOn(layer.garment)))
+                        'El calzado y los accesorios no se incluyen.',
+                    ].join(' '),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall,
             ),
