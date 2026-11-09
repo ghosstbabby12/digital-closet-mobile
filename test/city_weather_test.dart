@@ -7,7 +7,6 @@ import 'package:closet_ai/repositories/outfit_repository.dart';
 import 'package:closet_ai/repositories/weather_repository.dart';
 import 'package:closet_ai/screens/generate_outfit_screen.dart';
 import 'package:closet_ai/state/theme_provider.dart';
-import 'package:closet_ai/state/weather_provider.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -67,8 +66,6 @@ void main() {
           sharedPreferencesProvider.overrideWithValue(preferences),
           weatherRepositoryProvider.overrideWithValue(weather),
           outfitRepositoryProvider.overrideWithValue(outfits),
-          // Sin GPS en las pruebas: si se pide la ubicación, falla con un mensaje.
-          currentPositionProvider.overrideWith((ref) => throw Exception('Sin GPS en la prueba')),
         ],
         child: const MaterialApp(home: Scaffold(body: GenerateOutfitScreen())),
       ),
@@ -124,16 +121,22 @@ void main() {
     expect(outfits.requested, (6.24, -75.57));
   }, semanticsEnabled: false);
 
-  testWidgets('volver a mi ubicación borra la ciudad guardada', (tester) async {
-    await pumpScreen(tester, saved: medellin);
+  testWidgets('sin ciudad pide elegirla y no deja generar', (tester) async {
+    await pumpScreen(tester);
 
-    await tester.tap(find.text('Cambiar ciudad'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Usar mi ubicación actual'));
+    expect(find.text('Elegir ciudad'), findsOneWidget);
+    expect(find.textContaining('Elige tu ciudad'), findsOneWidget);
+    expect(weather.requests, isEmpty);
+    final button = tester.widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Vestirme hoy'));
+    expect(button.onPressed, isNull);
+  }, semanticsEnabled: false);
+
+  testWidgets('el buscador ya no ofrece la ubicación del teléfono', (tester) async {
+    await pumpScreen(tester);
+
+    await tester.tap(find.text('Elegir ciudad'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Mi ubicación actual'), findsOneWidget);
-    expect(preferences.getString('weather_city'), isNull);
-    expect(find.textContaining('Sin GPS en la prueba'), findsOneWidget);
+    expect(find.text('Usar mi ubicación actual'), findsNothing);
   }, semanticsEnabled: false);
 }

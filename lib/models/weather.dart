@@ -24,7 +24,7 @@ class Weather {
   }
 }
 
-/// Ciudad elegida para consultar el clima en vez de la ubicación del teléfono.
+/// Ciudad elegida para consultar el clima.
 class City {
   final String name;
   final String? state;

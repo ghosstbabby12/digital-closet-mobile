@@ -76,15 +76,13 @@ class _CitySearchSheetState extends ConsumerState<_CitySearchSheet> {
     });
   }
 
-  void _choose(City? city) {
-    final notifier = ref.read(selectedCityProvider.notifier);
-    city == null ? notifier.useDeviceLocation() : notifier.select(city);
+  void _choose(City city) {
+    ref.read(selectedCityProvider.notifier).select(city);
     Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SafeArea(
@@ -108,13 +106,6 @@ class _CitySearchSheetState extends ConsumerState<_CitySearchSheet> {
                   onChanged: _onChanged,
                 ),
                 const SizedBox(height: 8),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.my_location, color: scheme.primary),
-                  title: const Text('Usar mi ubicación actual'),
-                  onTap: () => _choose(null),
-                ),
-                const Divider(),
                 if (_searching) const LinearProgressIndicator(),
                 if (_message != null)
                   Padding(

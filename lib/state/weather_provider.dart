@@ -1,40 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 
 import '../models/weather.dart';
 import '../repositories/weather_repository.dart';
 import 'city_provider.dart';
 
-final currentPositionProvider = FutureProvider<Position>((ref) async {
-  final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-  if (!serviceEnabled) {
-    throw Exception('Activa el GPS/ubicación del teléfono para consultar el clima.');
-  }
-
-  var permission = await Geolocator.checkPermission();
-  if (permission == LocationPermission.denied) {
-    permission = await Geolocator.requestPermission();
-  }
-  if (permission == LocationPermission.denied) {
-    throw Exception('Se necesita permiso de ubicación para consultar el clima.');
-  }
-  if (permission == LocationPermission.deniedForever) {
-    throw Exception('Permiso de ubicación denegado permanentemente. Actívalo en ajustes.');
-  }
-
-  return Geolocator.getCurrentPosition();
-});
-
-/// Coordenadas para el clima: la ciudad elegida o, si no hay, el GPS.
-final weatherCoordinatesProvider = FutureProvider.autoDispose<({double lat, double lon})>((ref) async {
+/// Clima de la ciudad elegida, o null si todavía no se ha elegido ninguna.
+final weatherProvider = FutureProvider.autoDispose<Weather?>((ref) async {
   final city = ref.watch(selectedCityProvider);
-  if (city != null) return (lat: city.lat, lon: city.lon);
-  final position = await ref.watch(currentPositionProvider.future);
-  return (lat: position.latitude, lon: position.longitude);
-});
-
-final weatherProvider = FutureProvider.autoDispose<Weather>((ref) async {
-  final coordinates = await ref.watch(weatherCoordinatesProvider.future);
-  final repository = ref.read(weatherRepositoryProvider);
-  return repository.current(lat: coordinates.lat, lon: coordinates.lon);
+  if (city == null) return null;
+  return ref.read(weatherRepositoryProvider).current(lat: city.lat, lon: city.lon);
 });

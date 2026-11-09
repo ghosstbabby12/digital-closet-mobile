@@ -8,7 +8,7 @@ import 'theme_provider.dart';
 
 const _cityKey = 'weather_city';
 
-/// Ciudad elegida para el clima; null significa usar la ubicación del teléfono.
+/// Ciudad elegida para el clima; null mientras no se haya elegido ninguna.
 class SelectedCityNotifier extends StateNotifier<City?> {
   final SharedPreferences _preferences;
 
@@ -27,11 +27,6 @@ class SelectedCityNotifier extends StateNotifier<City?> {
   void select(City city) {
     state = city;
     _preferences.setString(_cityKey, jsonEncode(city.toJson()));
-  }
-
-  void useDeviceLocation() {
-    state = null;
-    _preferences.remove(_cityKey);
   }
 }
 

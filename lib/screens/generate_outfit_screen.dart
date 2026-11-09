@@ -23,15 +23,8 @@ class GenerateOutfitScreen extends ConsumerStatefulWidget {
 class _GenerateOutfitScreenState extends ConsumerState<GenerateOutfitScreen> {
   String _occasion = occasionOptions.first;
 
-  Future<void> _generate() async {
-    // Las mismas coordenadas del clima que se muestra: la ciudad elegida o el GPS.
-    final coordinates = await ref.read(weatherCoordinatesProvider.future);
-    if (!mounted) return;
-    await ref.read(outfitGenerateProvider.notifier).generate(
-          occasion: _occasion,
-          lat: coordinates.lat,
-          lon: coordinates.lon,
-        );
+  Future<void> _generate(City city) async {
+    await ref.read(outfitGenerateProvider.notifier).generate(occasion: _occasion, lat: city.lat, lon: city.lon);
   }
 
   @override
@@ -107,7 +100,7 @@ class _GenerateOutfitScreenState extends ConsumerState<GenerateOutfitScreen> {
                 PrimaryButton(
                   label: 'Vestirme hoy',
                   loading: generating,
-                  onPressed: weatherAsync.isLoading ? null : _generate,
+                  onPressed: city == null || weatherAsync.isLoading ? null : () => _generate(city),
                 ),
               ],
             ),
@@ -129,17 +122,17 @@ class _LocationRow extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Row(
       children: [
-        Icon(city == null ? Icons.my_location : Icons.location_on_outlined, size: 18, color: scheme.primary),
+        Icon(Icons.location_on_outlined, size: 18, color: scheme.primary),
         const SizedBox(width: 6),
         Expanded(
           child: Text(
-            city?.label ?? 'Mi ubicación actual',
+            city?.label ?? 'Sin ciudad elegida',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: scheme.onSurface),
           ),
         ),
-        TextButton(onPressed: onChange, child: const Text('Cambiar ciudad')),
+        TextButton(onPressed: onChange, child: Text(city == null ? 'Elegir ciudad' : 'Cambiar ciudad')),
       ],
     );
   }
@@ -174,21 +167,29 @@ class _WeatherCard extends StatelessWidget {
               IconButton(tooltip: 'Reintentar', icon: const Icon(Icons.refresh), onPressed: onRetry),
             ],
           ),
-          data: (weather) => IntrinsicHeight(
-            child: Row(
-              children: [
-                _WeatherStat(label: 'Temperatura', value: '${weather.tempC.round()}°C'),
-                const VerticalDivider(width: 20),
-                _WeatherStat(label: 'Clima', value: weather.condition as String),
-                // Con una ciudad elegida se muestra su nombre; OpenWeather a veces
-                // devuelve el de un barrio o una estación cercana.
-                if ((cityName ?? weather.city as String).isNotEmpty) ...[
-                  const VerticalDivider(width: 20),
-                  _WeatherStat(label: 'Ciudad', value: cityName ?? weather.city as String),
-                ],
-              ],
-            ),
-          ),
+          data: (weather) => weather == null
+              ? const Row(
+                  children: [
+                    Icon(Icons.location_city_outlined),
+                    SizedBox(width: 12),
+                    Expanded(child: Text('Elige tu ciudad para ver el clima y armar tu outfit.')),
+                  ],
+                )
+              : IntrinsicHeight(
+                  child: Row(
+                    children: [
+                      _WeatherStat(label: 'Temperatura', value: '${weather.tempC.round()}°C'),
+                      const VerticalDivider(width: 20),
+                      _WeatherStat(label: 'Clima', value: weather.condition as String),
+                      // Se muestra el nombre elegido: OpenWeather a veces devuelve el de
+                      // un barrio o una estación cercana.
+                      if ((cityName ?? weather.city as String).isNotEmpty) ...[
+                        const VerticalDivider(width: 20),
+                        _WeatherStat(label: 'Ciudad', value: cityName ?? weather.city as String),
+                      ],
+                    ],
+                  ),
+                ),
         ),
       ),
     );
