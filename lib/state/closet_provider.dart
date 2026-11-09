@@ -39,6 +39,19 @@ class ClosetNotifier extends StateNotifier<AsyncValue<List<Garment>>> {
     state = AsyncValue.data([created, ...state.value ?? []]);
   }
 
+  Future<void> updateGarment(
+    Garment garment, {
+    required String name,
+    required String color,
+    required GarmentCategory category,
+    required WarmthLevel warmth,
+  }) async {
+    final updated = await _repository.update(garment.id, name: name, color: color, category: category, warmth: warmth);
+    state = AsyncValue.data([
+      for (final item in state.value ?? <Garment>[]) item.id == updated.id ? updated : item,
+    ]);
+  }
+
   /// Devuelve la prenda con su recorte, generándolo solo si aún no existe.
   Future<Garment> ensureCutout(Garment garment) async {
     if (garment.cutoutUrl != null) return garment;

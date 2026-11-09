@@ -6,6 +6,7 @@ import '../core/app_theme.dart';
 import '../state/closet_provider.dart';
 import '../widgets/garment_card.dart';
 import '../widgets/screen_header.dart';
+import 'garment_detail_screen.dart';
 
 class ClosetScreen extends ConsumerWidget {
   const ClosetScreen({super.key});
@@ -70,7 +71,9 @@ class ClosetScreen extends ConsumerWidget {
                       final garment = garments[index];
                       return GarmentCard(
                         garment: garment,
-                        onDelete: () => ref.read(closetProvider.notifier).removeGarment(garment.id),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(builder: (_) => GarmentDetailScreen(garmentId: garment.id)),
+                        ),
                       );
                     },
                   );

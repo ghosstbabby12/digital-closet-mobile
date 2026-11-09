@@ -44,6 +44,27 @@ class GarmentRepository {
     }
   }
 
+  /// Cambia nombre, color, categoría y nivel de abrigo.
+  Future<Garment> update(
+    int id, {
+    required String name,
+    required String color,
+    required GarmentCategory category,
+    required WarmthLevel warmth,
+  }) async {
+    try {
+      final response = await _dio.patch('/garments/$id', data: {
+        'name': name,
+        'color': color,
+        'category': category.name,
+        'warmth': warmth.name,
+      });
+      return Garment.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw ApiException.fromDioError(e);
+    }
+  }
+
   /// Propone los datos de una prenda a partir de su foto, sin guardar nada.
   Future<GarmentSuggestion> suggest(XFile image) async {
     try {

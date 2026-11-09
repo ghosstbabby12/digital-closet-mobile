@@ -5,36 +5,29 @@ import '../models/garment.dart';
 
 class GarmentCard extends StatelessWidget {
   final Garment garment;
-  final VoidCallback? onDelete;
+  final VoidCallback? onTap;
 
-  const GarmentCard({super.key, required this.garment, this.onDelete});
+  const GarmentCard({super.key, required this.garment, this.onTap});
 
   @override
   Widget build(BuildContext context) {
+    final label = garment.name.isNotEmpty ? garment.name : garment.category.label;
+    return Semantics(
+      button: onTap != null,
+      label: label,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: _content(context),
+      ),
+    );
+  }
+
+  Widget _content(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              GarmentTile(garment: garment, radius: 20),
-              if (onDelete != null)
-                Positioned(
-                  top: 6,
-                  right: 6,
-                  child: IconButton(
-                    tooltip: 'Eliminar prenda',
-                    iconSize: 16,
-                    visualDensity: VisualDensity.compact,
-                    style: IconButton.styleFrom(backgroundColor: Colors.black45),
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: onDelete,
-                  ),
-                ),
-            ],
-          ),
-        ),
+        Expanded(child: GarmentTile(garment: garment, radius: 20)),
         const SizedBox(height: 8),
         Text(
           garment.name.isNotEmpty ? garment.name : garment.category.label,
