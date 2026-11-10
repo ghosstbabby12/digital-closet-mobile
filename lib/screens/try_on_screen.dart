@@ -230,9 +230,8 @@ class _TryOnScreenState extends ConsumerState<TryOnScreen> {
     );
   }
 
-  /// Prendas que la IA de prueba sabe vestir; el calzado y los accesorios no.
-  static bool _canTryOn(Garment garment) =>
-      garment.category != GarmentCategory.shoes && garment.category != GarmentCategory.accessory;
+  /// Prendas que la IA de prueba sabe vestir; los accesorios no.
+  static bool _canTryOn(Garment garment) => garment.category != GarmentCategory.accessory;
 
   /// Pide a la IA una foto realista con las prendas puestas, en orden de vestir.
   Future<void> _generateLook() async {
@@ -484,7 +483,7 @@ class _TryOnScreenState extends ConsumerState<TryOnScreen> {
                   : [
                       'El servicio FASHN recibe tu foto y estas prendas y dibuja el look; tarda unos segundos por prenda.',
                       if (_layers.any((layer) => !_canTryOn(layer.garment)))
-                        'El calzado y los accesorios no se incluyen.',
+                        'Los accesorios no se incluyen.',
                     ].join(' '),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall,

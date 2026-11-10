@@ -352,7 +352,7 @@ void main() {
       expect(find.byType(LookScreen), findsOneWidget);
     }, semanticsEnabled: false);
 
-    testWidgets('el calzado no se envía ni muestra el botón por sí solo', (tester) async {
+    testWidgets('el calzado también se envía a la IA', (tester) async {
       final shoes = Garment(
         id: 3,
         name: 'Tenis',
@@ -374,16 +374,17 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('garment-3')));
       await tester.pumpAndSettle();
-      expect(find.text('Ver cómo me queda'), findsNothing);
+      expect(find.text('Ver cómo me queda'), findsOneWidget);
 
       await tester.tap(find.byKey(garmentKey));
       await tester.pumpAndSettle();
-      expect(find.textContaining('El calzado y los accesorios no se incluyen'), findsOneWidget);
+      expect(find.textContaining('no se incluyen'), findsNothing);
       await tester.tap(find.text('Ver cómo me queda'));
       await tester.pumpAndSettle();
 
+      // En orden de vestir; el servidor igual pone los zapatos al final.
       expect(looks.requests, [
-        [1],
+        [3, 1],
       ]);
     }, semanticsEnabled: false);
 
