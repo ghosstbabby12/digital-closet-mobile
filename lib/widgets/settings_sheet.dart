@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../screens/profile_screen.dart';
 import '../state/auth_provider.dart';
 import '../state/theme_provider.dart';
 import 'pill_tabs.dart';
@@ -27,7 +28,20 @@ class _SettingsSheet extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text('Ajustes', style: Theme.of(context).textTheme.headlineMedium),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.person_outline),
+              title: const Text('Ver mi perfil', style: TextStyle(fontWeight: FontWeight.w600)),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                final navigator = Navigator.of(context);
+                navigator.pop();
+                navigator.push(MaterialPageRoute<void>(builder: (_) => const ProfileScreen()));
+              },
+            ),
+            const Divider(),
+            const SizedBox(height: 8),
             Text('Apariencia', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 10),
             PillTabs(
