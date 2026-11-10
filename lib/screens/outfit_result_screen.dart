@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../models/garment.dart';
 import '../models/outfit.dart';
+import '../state/try_on_request_provider.dart';
 import '../widgets/garment_card.dart';
 import '../widgets/primary_button.dart';
 
-class OutfitResultScreen extends StatelessWidget {
+class OutfitResultScreen extends ConsumerWidget {
   final Outfit outfit;
 
   const OutfitResultScreen({super.key, required this.outfit});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
     return Scaffold(
       appBar: AppBar(title: const Text('Tu outfit de hoy')),
@@ -74,7 +76,15 @@ class OutfitResultScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            PrimaryButton(label: 'Listo', onPressed: () => context.pop()),
+            PrimaryButton(
+              label: 'Probar cómo me queda',
+              onPressed: () {
+                ref.read(tryOnRequestProvider.notifier).state = outfit.garments;
+                context.pop();
+              },
+            ),
+            const SizedBox(height: 8),
+            TextButton(onPressed: () => context.pop(), child: const Text('Listo')),
           ],
         ),
       ),

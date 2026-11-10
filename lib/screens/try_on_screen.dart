@@ -11,6 +11,7 @@ import '../models/garment.dart';
 import '../repositories/look_repository.dart';
 import '../state/body_photo_provider.dart';
 import '../state/closet_provider.dart';
+import '../state/try_on_request_provider.dart';
 import '../state/try_on_shapes_provider.dart';
 import '../widgets/garment_card.dart';
 import '../widgets/primary_button.dart';
@@ -252,6 +253,18 @@ class _TryOnScreenState extends ConsumerState<TryOnScreen> {
     }
   }
 
+  /// Viste todas las prendas de un outfit, quitando las que hubiera puestas.
+  Future<void> _tryOn(List<Garment> garments) async {
+    setState(() {
+      _layers.clear();
+      _selectedId = null;
+    });
+    for (final garment in garments) {
+      if (!mounted) return;
+      await _addGarment(garment);
+    }
+  }
+
   void _refitSelected() => _updateSelected((layer) => _fitted(layer.copyWith(autoFit: true)));
 
   /// Capas en orden de vestir (pantalón, blusa, chaqueta encima); dentro de la
@@ -289,6 +302,12 @@ class _TryOnScreenState extends ConsumerState<TryOnScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(tryOnRequestProvider, (previous, next) {
+      if (next == null) return;
+      // Se limpia después del frame para que la pestaña de inicio también la vea.
+      WidgetsBinding.instance.addPostFrameCallback((_) => ref.read(tryOnRequestProvider.notifier).state = null);
+      _tryOn(next);
+    });
     final photoAsync = ref.watch(bodyPhotoProvider);
     final photoUrl = photoAsync.valueOrNull;
 
