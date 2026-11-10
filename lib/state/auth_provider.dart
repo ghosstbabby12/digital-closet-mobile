@@ -17,23 +17,11 @@ class AuthState {
   final bool isSubmitting;
   final String? error;
 
-  const AuthState({
-    this.token,
-    this.user,
-    this.isRestoring = true,
-    this.isSubmitting = false,
-    this.error,
-  });
+  const AuthState({this.token, this.user, this.isRestoring = true, this.isSubmitting = false, this.error});
 
   bool get isAuthenticated => token != null && user != null;
 
-  AuthState copyWith({
-    String? token,
-    AppUser? user,
-    bool? isRestoring,
-    bool? isSubmitting,
-    String? error,
-  }) {
+  AuthState copyWith({String? token, AppUser? user, bool? isRestoring, bool? isSubmitting, String? error}) {
     return AuthState(
       token: token ?? this.token,
       user: user ?? this.user,
@@ -81,11 +69,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<bool> login(String email, String password) =>
       _submit(() => _dio.post('/auth/login', data: {'email': email, 'password': password}));
 
-  Dio get _dio => Dio(BaseOptions(
-        baseUrl: apiBaseUrl,
-        connectTimeout: apiConnectTimeout,
-        receiveTimeout: apiReceiveTimeout,
-      ));
+  Dio get _dio =>
+      Dio(BaseOptions(baseUrl: apiBaseUrl, connectTimeout: apiConnectTimeout, receiveTimeout: apiReceiveTimeout));
 
   Future<bool> _submit(Future<Response> Function() request) async {
     state = state.copyWith(isSubmitting: true, error: null);
@@ -100,6 +85,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isSubmitting: false, error: ApiException.fromDioError(e).message);
       return false;
     }
+  }
+
+  /// Tras cambiar el correo en el perfil: el token va ligado al correo, así
+  /// que se guarda el nuevo que devuelve el servidor.
+  Future<void> updateSession(String token, String email) async {
+    final user = AppUser(id: state.user!.id, email: email);
+    await _persistSession(token, user);
+    state = state.copyWith(token: token, user: user);
   }
 
   Future<void> logout() async {
