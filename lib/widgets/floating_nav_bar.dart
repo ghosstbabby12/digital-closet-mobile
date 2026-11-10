@@ -1,11 +1,21 @@
 import 'package:flutter/material.dart';
 
 class FloatingNavItem {
-  final IconData icon;
-  final IconData selectedIcon;
+  final IconData? icon;
+  final IconData? selectedIcon;
+
+  /// Para íconos dibujados a mano (ej. el espejo del Probador).
+  final Widget Function(Color color, bool selected)? iconBuilder;
   final String label;
 
-  const FloatingNavItem({required this.icon, required this.selectedIcon, required this.label});
+  const FloatingNavItem({required IconData this.icon, required IconData this.selectedIcon, required this.label})
+    : iconBuilder = null;
+
+  const FloatingNavItem.custom({
+    required Widget Function(Color color, bool selected) this.iconBuilder,
+    required this.label,
+  }) : icon = null,
+       selectedIcon = null;
 }
 
 /// Barra de navegación flotante en forma de píldora.
@@ -30,22 +40,14 @@ class FloatingNavBar extends StatelessWidget {
             borderRadius: BorderRadius.circular(30),
             border: Border.all(color: scheme.outlineVariant),
             boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.10),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
+              BoxShadow(color: Colors.black.withValues(alpha: 0.10), blurRadius: 24, offset: const Offset(0, 8)),
             ],
           ),
           child: Row(
             children: [
               for (var i = 0; i < items.length; i++)
                 Expanded(
-                  child: _NavButton(
-                    item: items[i],
-                    selected: i == selectedIndex,
-                    onTap: () => onSelected(i),
-                  ),
+                  child: _NavButton(item: items[i], selected: i == selectedIndex, onTap: () => onSelected(i)),
                 ),
             ],
           ),
@@ -82,9 +84,13 @@ class _NavButton extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(selected ? item.selectedIcon : item.icon, size: 22, color: color),
+              item.iconBuilder?.call(color, selected) ??
+                  Icon(selected ? item.selectedIcon : item.icon, size: 22, color: color),
               const SizedBox(height: 2),
-              Text(item.label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+              Text(
+                item.label,
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
+              ),
             ],
           ),
         ),

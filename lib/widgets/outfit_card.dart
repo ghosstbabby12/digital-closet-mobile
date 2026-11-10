@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../models/outfit.dart';
 import 'garment_card.dart';
+import '../core/weather_text.dart';
 
 class OutfitCard extends StatelessWidget {
   final Outfit outfit;
@@ -48,7 +49,7 @@ class OutfitCard extends StatelessWidget {
             Text(
               [
                 if (outfit.isEvent) occasion,
-                '${outfit.weatherTempC.round()}°C · ${outfit.weatherCondition}',
+                '${outfit.weatherTempC.round()}°C · ${friendlyCondition(outfit.weatherCondition)}',
               ].join(' · '),
               style: textTheme.bodySmall,
             ),

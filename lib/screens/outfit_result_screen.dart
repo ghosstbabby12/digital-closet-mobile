@@ -8,6 +8,7 @@ import '../models/outfit.dart';
 import '../state/try_on_request_provider.dart';
 import '../widgets/garment_card.dart';
 import '../widgets/primary_button.dart';
+import '../core/weather_text.dart';
 
 class OutfitResultScreen extends ConsumerWidget {
   final Outfit outfit;
@@ -30,7 +31,7 @@ class OutfitResultScreen extends ConsumerWidget {
                 if (outfit.eventDate != null)
                   Chip(label: Text(DateFormat("d 'de' MMMM", 'es').format(outfit.eventDate!))),
                 Chip(label: Text('${outfit.occasion[0].toUpperCase()}${outfit.occasion.substring(1)}')),
-                Chip(label: Text('${outfit.weatherTempC.round()}°C · ${outfit.weatherCondition}')),
+                Chip(label: Text('${outfit.weatherTempC.round()}°C · ${friendlyCondition(outfit.weatherCondition)}')),
               ],
             ),
             const SizedBox(height: 18),

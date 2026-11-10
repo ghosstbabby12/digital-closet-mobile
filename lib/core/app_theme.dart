@@ -9,9 +9,10 @@ const double floatingNavClearance = 104;
 /// `Theme.of(context).colorScheme`, así funcionan en modo claro y oscuro.
 const _lightScheme = ColorScheme(
   brightness: Brightness.light,
-  primary: Color(0xFF5F7563),
+  // Verde salvia con contraste ≥ 4.5:1 sobre el fondo crema y las tarjetas.
+  primary: Color(0xFF566B5A),
   onPrimary: Color(0xFFFFFFFF),
-  secondary: Color(0xFF5F7563),
+  secondary: Color(0xFF566B5A),
   onSecondary: Color(0xFFFFFFFF),
   error: Color(0xFFB3261E),
   onError: Color(0xFFFFFFFF),
@@ -48,11 +49,12 @@ ThemeData _buildTheme(ColorScheme scheme, Color background) {
     useMaterial3: true,
     colorScheme: scheme,
     scaffoldBackgroundColor: background,
+    // Inter también en los estilos sueltos (botones, chips, etiquetas), que si
+    // no caen en la fuente por defecto del sistema (Roboto).
+    fontFamily: GoogleFonts.inter().fontFamily,
   );
-  final textTheme = GoogleFonts.interTextTheme(base.textTheme).apply(
-    bodyColor: scheme.onSurface,
-    displayColor: scheme.onSurface,
-  );
+  final textTheme = GoogleFonts.interTextTheme(base.textTheme)
+      .apply(bodyColor: scheme.onSurface, displayColor: scheme.onSurface);
 
   return base.copyWith(
     textTheme: textTheme.copyWith(
@@ -67,13 +69,11 @@ ThemeData _buildTheme(ColorScheme scheme, Color background) {
         fontWeight: FontWeight.w800,
         letterSpacing: -0.6,
       ),
-      titleLarge: textTheme.titleLarge?.copyWith(
-        fontSize: 18,
-        fontWeight: FontWeight.w700,
-        letterSpacing: -0.2,
-      ),
-      bodyMedium: textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant, height: 1.4),
-      bodySmall: textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+      titleLarge: textTheme.titleLarge?.copyWith(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: -0.2),
+      // Material 3 trae un espaciado entre letras amplio (0.25-0.5) que con Inter se ve suelto.
+      bodyLarge: textTheme.bodyLarge?.copyWith(letterSpacing: 0, height: 1.4),
+      bodyMedium: textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant, height: 1.4, letterSpacing: 0.1),
+      bodySmall: textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant, letterSpacing: 0.2),
     ),
     appBarTheme: AppBarTheme(
       backgroundColor: background,
@@ -100,13 +100,11 @@ ThemeData _buildTheme(ColorScheme scheme, Color background) {
         disabledForegroundColor: scheme.onPrimary,
         elevation: 0,
         minimumSize: const Size.fromHeight(54),
-        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        textStyle: textTheme.labelLarge?.copyWith(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     ),
-    textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(foregroundColor: scheme.primary),
-    ),
+    textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: scheme.primary)),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: scheme.surface,
@@ -138,9 +136,7 @@ ThemeData _buildTheme(ColorScheme scheme, Color background) {
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: scheme.surface,
       surfaceTintColor: Colors.transparent,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
     ),
     dividerTheme: DividerThemeData(color: scheme.outlineVariant, space: 1),
     progressIndicatorTheme: ProgressIndicatorThemeData(color: scheme.primary),

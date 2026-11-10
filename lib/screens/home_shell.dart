@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../state/try_on_request_provider.dart';
 
 import '../widgets/floating_nav_bar.dart';
+import '../widgets/mirror_icon.dart';
 import 'closet_screen.dart';
 import 'generate_outfit_screen.dart';
 import 'history_screen.dart';
@@ -25,9 +26,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   static const _items = [
     FloatingNavItem(icon: Icons.checkroom_outlined, selectedIcon: Icons.checkroom, label: 'Clóset'),
     FloatingNavItem(icon: Icons.auto_awesome_outlined, selectedIcon: Icons.auto_awesome, label: 'Estilista'),
-    FloatingNavItem(icon: Icons.accessibility_new_outlined, selectedIcon: Icons.accessibility_new, label: 'Probador'),
-    FloatingNavItem(icon: Icons.calendar_month_outlined, selectedIcon: Icons.calendar_month, label: 'Outfits'),
+    FloatingNavItem.custom(iconBuilder: _mirror, label: 'Probador'),
+    FloatingNavItem(icon: Icons.dry_cleaning_outlined, selectedIcon: Icons.dry_cleaning, label: 'Outfits'),
   ];
+
+  static Widget _mirror(Color color, bool selected) => MirrorIcon(size: 22, color: color, filled: selected);
 
   @override
   Widget build(BuildContext context) {
