@@ -78,6 +78,11 @@ class BodyShape {
   final double shoulderWidth;
   final double hipWidth;
 
+  /// Centro y ancho de los pies juntos, medidos en la franja más baja de la
+  /// silueta: no siempre caen bajo la cabeza (pies cruzados, peso en una pierna).
+  final double feetCenterX;
+  final double feetWidth;
+
   const BodyShape({
     required this.imageAspect,
     required this.top,
@@ -87,6 +92,8 @@ class BodyShape {
     required this.crotchY,
     required this.shoulderWidth,
     required this.hipWidth,
+    required this.feetCenterX,
+    required this.feetWidth,
   });
 
   double get height => bottom - top;
@@ -182,6 +189,16 @@ BodyShape? analyzeBody(RgbaPixels pixels, {int alphaThreshold = 128}) {
       : measuredShoulders;
   final hips = widthAt(crotchRow - (height * 0.03).round());
 
+  // Pies: el tramo del cuerpo en el último 5 % de la altura.
+  var feetLeft = pixels.width, feetRight = -1;
+  for (var y = rowAt(0.95); y <= lastRow; y++) {
+    final span = rows[y];
+    if (span == null) continue;
+    if (span.$1 < feetLeft) feetLeft = span.$1;
+    if (span.$2 > feetRight) feetRight = span.$2;
+  }
+  final hasFeet = feetRight >= feetLeft;
+
   return BodyShape(
     imageAspect: pixels.width / pixels.height,
     top: firstRow / pixels.height,
@@ -191,6 +208,8 @@ BodyShape? analyzeBody(RgbaPixels pixels, {int alphaThreshold = 128}) {
     crotchY: crotchRow / pixels.height,
     shoulderWidth: shoulders / pixels.width,
     hipWidth: (hips > 0 ? hips : shoulders) / pixels.width,
+    feetCenterX: hasFeet ? (feetLeft + feetRight + 1) / 2 / pixels.width : (center + 0.5) / pixels.width,
+    feetWidth: hasFeet ? (feetRight - feetLeft + 1) / pixels.width : (hips > 0 ? hips : shoulders) * 0.6 / pixels.width,
   );
 }
 
@@ -211,9 +230,10 @@ bool _centerInGap(List<(int, int)> spans, double center) =>
   if (leftOfCenter != null && rightOfCenter != null && rightOfCenter.$1 - leftOfCenter.$2 <= maxGap) {
     return (leftOfCenter.$1, rightOfCenter.$2);
   }
-  return [leftOfCenter, rightOfCenter].whereType<(int, int)>().reduce(
-        (a, b) => (center - a.$2).abs() < (b.$1 - center).abs() ? a : b,
-      );
+  return [
+    leftOfCenter,
+    rightOfCenter,
+  ].whereType<(int, int)>().reduce((a, b) => (center - a.$2).abs() < (b.$1 - center).abs() ? a : b);
 }
 
 /// Dónde colocar una prenda: centro horizontal y borde superior como fracción
@@ -228,13 +248,13 @@ class GarmentFit {
 
 /// Orden de vestir, de abajo hacia arriba: el pantalón bajo la blusa y la chaqueta encima.
 int layerOrder(GarmentCategory category) => switch (category) {
-      GarmentCategory.bottom => 0,
-      GarmentCategory.shoes => 1,
-      GarmentCategory.dress => 2,
-      GarmentCategory.top => 3,
-      GarmentCategory.outerwear => 4,
-      GarmentCategory.accessory => 5,
-    };
+  GarmentCategory.bottom => 0,
+  GarmentCategory.shoes => 1,
+  GarmentCategory.dress => 2,
+  GarmentCategory.top => 3,
+  GarmentCategory.outerwear => 4,
+  GarmentCategory.accessory => 5,
+};
 
 /// null si la categoría no tiene una zona fija (accesorios).
 GarmentFit? fitGarment(GarmentCategory category, BodyShape body, GarmentShape garment) {
@@ -268,13 +288,13 @@ GarmentFit? fitGarment(GarmentCategory category, BodyShape body, GarmentShape ga
       final width = (length / garment.aspect).clamp(0.0, hips * 1.6);
       return GarmentFit(centerX: body.centerX, top: top, width: width / aspect);
     case GarmentCategory.shoes:
-      final height = 0.07 * body.height;
-      final width = (height / garment.aspect).clamp(0.0, hips * 1.3);
-      return GarmentFit(
-        centerX: body.centerX,
-        top: body.bottom - width * garment.aspect,
-        width: width / aspect,
-      );
+      // El par de zapatos se escala por el ancho de los pies, un poco más
+      // holgado, y se apoya en la planta; no puede ser más alto que un botín.
+      final feet = body.feetWidth * aspect;
+      var width = (feet * 1.15).clamp(hips * 0.45, hips * 1.3);
+      final maxHeight = 0.09 * body.height;
+      if (width * garment.aspect > maxHeight) width = maxHeight / garment.aspect;
+      return GarmentFit(centerX: body.feetCenterX, top: body.bottom - width * garment.aspect, width: width / aspect);
     case GarmentCategory.accessory:
       return null;
   }

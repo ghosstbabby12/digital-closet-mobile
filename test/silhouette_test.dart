@@ -150,6 +150,38 @@ void main() {
     });
   }
 
+  test('los zapatos se apoyan en los pies aunque no estén bajo la cabeza', () {
+    // Misma persona, pero con los pies desplazados a la derecha (peso en una pierna).
+    final c = Canvas(200, 400)
+      ..ellipse(100, 45, 22, 30)
+      ..rect(92, 72, 108, 88)
+      ..torso([(88, 60, 140), (170, 75, 125), (210, 68, 132)])
+      ..rect(72, 210, 98, 360)
+      ..rect(102, 210, 128, 360)
+      ..rect(100, 360, 150, 385);
+    final body = analyzeBody(c.pixels)!;
+    const shoes = GarmentShape(left: 0, top: 0, right: 1, bottom: 1, aspect: 0.5);
+
+    final fit = fitGarment(GarmentCategory.shoes, body, shoes)!;
+
+    expect(body.feetCenterX * 200, closeTo(125, 2));
+    expect(fit.centerX, closeTo(body.feetCenterX, 1e-9));
+    final bottom = fit.top + fit.width * body.imageAspect * shoes.aspect;
+    expect(bottom, closeTo(body.bottom, 1e-9));
+    // Más anchos que los pies, pero sin pasarse.
+    expect(fit.width, greaterThan(body.feetWidth));
+    expect(fit.width, lessThan(body.feetWidth * 1.3));
+  });
+
+  test('unos botines altos se achican para no subir por la pierna', () {
+    final body = analyzeBody(person(handsOnHips: false).pixels)!;
+    const boots = GarmentShape(left: 0, top: 0, right: 1, bottom: 1, aspect: 3);
+
+    final fit = fitGarment(GarmentCategory.shoes, body, boots)!;
+
+    expect(fit.width * body.imageAspect * boots.aspect, closeTo(0.09 * body.height, 1e-9));
+  });
+
   test('los accesorios no tienen una zona fija', () {
     final body = analyzeBody(person(handsOnHips: false).pixels)!;
     const bag = GarmentShape(left: 0, top: 0, right: 1, bottom: 1, aspect: 1);
