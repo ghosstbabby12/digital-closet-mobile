@@ -7,11 +7,15 @@ import 'garment_card.dart';
 class OutfitCard extends StatelessWidget {
   final Outfit outfit;
 
-  const OutfitCard({super.key, required this.outfit});
+  /// Si se pasa, la tarjeta muestra un botón para borrar el outfit.
+  final VoidCallback? onDelete;
+
+  const OutfitCard({super.key, required this.outfit, this.onDelete});
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final occasion = '${outfit.occasion[0].toUpperCase()}${outfit.occasion.substring(1)}';
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -20,20 +24,34 @@ class OutfitCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Expanded(
-                  child: Text(
-                    '${outfit.occasion[0].toUpperCase()}${outfit.occasion.substring(1)}',
-                    style: textTheme.titleLarge,
-                  ),
-                ),
+                if (outfit.isEvent) ...[
+                  Icon(Icons.event_outlined, size: 20, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 6),
+                ],
+                Expanded(child: Text(outfit.eventTitle ?? occasion, style: textTheme.titleLarge)),
                 Text(
-                  DateFormat('d MMM, HH:mm', 'es').format(outfit.createdAt.toLocal()),
+                  outfit.isEvent
+                      ? DateFormat("d MMM", 'es').format(outfit.eventDate!)
+                      : DateFormat('d MMM, HH:mm', 'es').format(outfit.createdAt.toLocal()),
                   style: textTheme.bodySmall,
                 ),
+                if (onDelete != null)
+                  IconButton(
+                    tooltip: outfit.isEvent ? 'Borrar evento' : 'Borrar outfit',
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.delete_outline, size: 20),
+                    onPressed: onDelete,
+                  ),
               ],
             ),
             const SizedBox(height: 2),
-            Text('${outfit.weatherTempC.round()}°C · ${outfit.weatherCondition}', style: textTheme.bodySmall),
+            Text(
+              [
+                if (outfit.isEvent) occasion,
+                '${outfit.weatherTempC.round()}°C · ${outfit.weatherCondition}',
+              ].join(' · '),
+              style: textTheme.bodySmall,
+            ),
             if (outfit.garments.isNotEmpty) ...[
               const SizedBox(height: 12),
               SizedBox(
@@ -42,10 +60,8 @@ class OutfitCard extends StatelessWidget {
                   scrollDirection: Axis.horizontal,
                   itemCount: outfit.garments.length,
                   separatorBuilder: (context, index) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) => SizedBox(
-                    width: 92,
-                    child: GarmentTile(garment: outfit.garments[index]),
-                  ),
+                  itemBuilder: (context, index) =>
+                      SizedBox(width: 92, child: GarmentTile(garment: outfit.garments[index])),
                 ),
               ),
             ],

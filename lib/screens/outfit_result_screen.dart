@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../models/garment.dart';
 import '../models/outfit.dart';
@@ -17,7 +18,7 @@ class OutfitResultScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Tu outfit de hoy')),
+      appBar: AppBar(title: Text(outfit.eventTitle ?? 'Tu outfit de hoy')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
@@ -26,6 +27,8 @@ class OutfitResultScreen extends ConsumerWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
+                if (outfit.eventDate != null)
+                  Chip(label: Text(DateFormat("d 'de' MMMM", 'es').format(outfit.eventDate!))),
                 Chip(label: Text('${outfit.occasion[0].toUpperCase()}${outfit.occasion.substring(1)}')),
                 Chip(label: Text('${outfit.weatherTempC.round()}°C · ${outfit.weatherCondition}')),
               ],

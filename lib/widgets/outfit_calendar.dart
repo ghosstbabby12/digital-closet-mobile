@@ -5,7 +5,7 @@ import '../core/image_url.dart';
 import '../models/garment.dart';
 import '../models/outfit.dart';
 
-/// Calendario mensual: cada día muestra una prenda del outfit generado ese día.
+/// Calendario mensual: cada día muestra una prenda del outfit de ese día o de su evento.
 class OutfitCalendar extends StatefulWidget {
   final List<Outfit> outfits;
   final DateTime selectedDay;
@@ -35,8 +35,7 @@ class _OutfitCalendarState extends State<OutfitCalendar> {
   Map<DateTime, Garment?> _thumbnailsByDay() {
     final thumbnails = <DateTime, Garment?>{};
     for (final outfit in widget.outfits) {
-      final local = outfit.createdAt.toLocal();
-      final day = DateTime(local.year, local.month, local.day);
+      final day = outfit.calendarDay;
       thumbnails[day] ??= outfit.garments.isNotEmpty ? outfit.garments.first : null;
     }
     return thumbnails;

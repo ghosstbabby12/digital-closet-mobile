@@ -39,7 +39,13 @@ class FakeOutfits extends OutfitRepository {
   (double, double)? requested;
 
   @override
-  Future<Outfit> generate({required String occasion, required double lat, required double lon}) async {
+  Future<Outfit> generate({
+    required String occasion,
+    required double lat,
+    required double lon,
+    String? eventTitle,
+    DateTime? eventDate,
+  }) async {
     requested = (lat, lon);
     throw ApiException('detenido en la prueba');
   }

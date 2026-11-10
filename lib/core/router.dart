@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../models/outfit.dart';
+import '../screens/add_event_screen.dart';
 import '../screens/add_garment_screen.dart';
 import '../screens/home_shell.dart';
 import '../screens/login_screen.dart';
@@ -45,6 +46,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
       GoRoute(path: '/home', builder: (context, state) => const HomeShell()),
       GoRoute(path: '/add-garment', builder: (context, state) => const AddGarmentScreen()),
+      GoRoute(
+        path: '/add-event',
+        builder: (context, state) => AddEventScreen(day: state.extra as DateTime),
+      ),
       GoRoute(
         path: '/outfit-result',
         builder: (context, state) => OutfitResultScreen(outfit: state.extra as Outfit),
