@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:closet_ai/core/config/demo_account.dart';
 import 'package:closet_ai/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:closet_ai/features/auth/presentation/widgets/demo_credentials_box.dart';
 import 'package:closet_ai/core/widgets/brand_mark.dart';
 import 'package:closet_ai/core/widgets/primary_button.dart';
 
@@ -55,6 +57,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 32),
+                  if (hasDemoAccount) ...[
+                    DemoCredentialsBox(
+                      onUse: (email, password) {
+                        _emailController.text = email;
+                        _passwordController.text = password;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                  ],
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
