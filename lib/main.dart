@@ -4,19 +4,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'core/app_theme.dart';
-import 'core/router.dart';
-import 'state/theme_provider.dart';
+import 'package:closet_ai/core/theme/app_theme.dart';
+import 'package:closet_ai/core/router/app_router.dart';
+import 'package:closet_ai/features/settings/presentation/controllers/theme_controller.dart';
+import 'package:closet_ai/core/storage/preferences_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('es');
   final preferences = await SharedPreferences.getInstance();
   runApp(
-    ProviderScope(
-      overrides: [sharedPreferencesProvider.overrideWithValue(preferences)],
-      child: const ClosetApp(),
-    ),
+    ProviderScope(overrides: [sharedPreferencesProvider.overrideWithValue(preferences)], child: const ClosetApp()),
   );
 }
 
@@ -39,14 +37,11 @@ class ClosetApp extends ConsumerWidget {
         final isDark = theme.brightness == Brightness.dark;
         return AnnotatedRegion<SystemUiOverlayStyle>(
           value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
-          // En web y escritorio el contenido no se estira a todo el ancho.
+          // On web and desktop the content does not stretch to the full width.
           child: ColoredBox(
             color: theme.scaffoldBackgroundColor,
             child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 600),
-                child: child,
-              ),
+              child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 600), child: child),
             ),
           ),
         );
